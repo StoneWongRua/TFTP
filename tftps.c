@@ -21,7 +21,7 @@
 void getFunction(int fd, char * fileName){
 	int file_fd;
 	long ret;
-	
+
 	static char buffer[BUFSIZE + 1]; /* static so zero filled */
 
 	if ((file_fd = open(fileName, O_RDONLY)) == -1) { /* open the file for reading */
@@ -155,7 +155,20 @@ int main(int argc, char **argv) {
 		if (socketfd < 0)
 			printf("ERROR system call - accept error\n");
 		else
-			ftp(socketfd, hit);
-
+		{
+			pid = fork();
+			if(pid==0)
+			{
+				printf("Pedido atendido....\nPID: %d\n\n\n", getpid());
+				ftp(socketfd, hit);
+				printf("\n\n\nMy work here is done...\nGoodbye cruel world :(\n\n\n");
+			}
+			else
+			{
+				//Temos de fechar o socketfd para que seja apenas a child a tratar dos pedidos, caso contrário iria ficar aqui pendurado
+				close(socketfd);
+				kill(pid, SIGCHLD);
+			}
+		}
 	}
 }
