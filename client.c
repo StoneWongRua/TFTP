@@ -131,6 +131,10 @@ int main(int argc, char *argv[]) {
 			// close socket descriptor
 			close(sockfd);
 		}
+    } else if (!strcmp(argv[3], "ls")) {
+        
+        printf("LS bitch");
+        
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
