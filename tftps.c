@@ -19,11 +19,13 @@
 
 #define BUFSIZE 8096
 
+int ftp(int fd, int hit);
+
 void getFunction(int fd, char * fileName);
 
 void putFunction(int fd, char * fileName);
 
-int ftp(int fd, int hit);
+void lsFunction(int fd, char * fileName);
 
 /* just checks command line arguments, setup a listening socket and block on accept waiting for clients */
 
@@ -89,6 +91,54 @@ int main(int argc, char **argv) {
 	}
 }
 
+/* this is the ftp server function */
+int ftp(int fd, int hit) {
+	int j, file_fd, filedesc;
+	long i, ret, len;
+	char * fstr;
+	static char buffer[BUFSIZE + 1]; /* static so zero filled */
+
+	ret = read(fd, buffer, BUFSIZE); // read FTP request
+
+	if (ret == 0 || ret == -1) { /* read failure stop now */
+		close(fd);
+		return 1;
+	}
+	if (ret > 0 && ret < BUFSIZE) /* return code is valid chars */
+		buffer[ret] = 0; /* terminate the buffer */
+	else
+		buffer[0] = 0;
+
+	for (i = 0; i < ret; i++) /* remove CF and LF characters */
+		if (buffer[i] == '\r' || buffer[i] == '\n')
+			buffer[i] = '*';
+
+	printf("LOG request %s - hit %d\n", buffer, hit);
+
+	/* null terminate after the second space to ignore extra stuff */
+	for (i = 4; i < BUFSIZE; i++) {
+		if (buffer[i] == ' ') { /* string is "GET URL " +lots of other stuff */
+			buffer[i] = 0;
+			break;
+		}
+	}
+
+	if (!strncmp(buffer, "get ", 4)) {
+		// GET
+		getFunction(fd, &buffer[5]);
+	} else if (!strncmp(buffer, "put ", 4)) {
+		// PUT
+		putFunction(fd,&buffer[5]);
+	} else if (!strncmp(buffer, "ls ", 2)) {
+		// PUT
+		lsFunction(fd,&buffer[5]);
+	}
+
+	sleep(1); /* allow socket to drain before signalling the socket is closed */
+	close(fd);
+	return 0;
+}
+
 void getFunction(int fd, char * fileName){
 	int file_fd;
 	long ret;
@@ -129,47 +179,27 @@ void putFunction(int fd, char * fileName){
 	}
 }
 
-/* this is the ftp server function */
-int ftp(int fd, int hit) {
-	int j, file_fd, filedesc;
-	long i, ret, len;
-	char * fstr;
+void lsFunction(int fd, char * fileName){
+	int file_fd;
+	long ret;
+	
 	static char buffer[BUFSIZE + 1]; /* static so zero filled */
+    
+	printf("LOG Header %s \n", fileName);
 
-	ret = read(fd, buffer, BUFSIZE); // read FTP request
+	file_fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+	if (file_fd == -1) {
+		sprintf(buffer, "ERROR");
+		write(fd, buffer, strlen(buffer));
+	} else {
+		sprintf(buffer, "OK");
+		write(fd, buffer, strlen(buffer));
+        
+        
+		sprintf(buffer, "Estou a enviar um LS");
+		write(fd, buffer, strlen(buffer));
 
-	if (ret == 0 || ret == -1) { /* read failure stop now */
-		close(fd);
-		return 1;
+		/*while ((ret = read(fd, buffer, BUFSIZE)) > 0)
+			write(file_fd, buffer, ret);*/
 	}
-	if (ret > 0 && ret < BUFSIZE) /* return code is valid chars */
-		buffer[ret] = 0; /* terminate the buffer */
-	else
-		buffer[0] = 0;
-
-	for (i = 0; i < ret; i++) /* remove CF and LF characters */
-		if (buffer[i] == '\r' || buffer[i] == '\n')
-			buffer[i] = '*';
-
-	printf("LOG request %s - hit %d\n", buffer, hit);
-
-	/* null terminate after the second space to ignore extra stuff */
-	for (i = 4; i < BUFSIZE; i++) {
-		if (buffer[i] == ' ') { /* string is "GET URL " +lots of other stuff */
-			buffer[i] = 0;
-			break;
-		}
-	}
-
-	if (!strncmp(buffer, "get ", 4)) {
-		// GET
-		getFunction(fd, &buffer[5]);
-	} else if (!strncmp(buffer, "put ", 4)) {
-		// PUT
-		putFunction(fd,&buffer[5]);
-	}
-
-	sleep(1); /* allow socket to drain before signalling the socket is closed */
-	close(fd);
-	return 0;
 }

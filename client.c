@@ -35,12 +35,12 @@ int main(int argc, char *argv[]) {
 	char fileName[50];
 
 	if (argc != 5) {
-		printf("Usage: ./client <SERVER IP ADDRESS> <LISTENING PORT>\n");
-		printf("Example: ./client 127.0.0.1 8141 get remoteFileName\n./client 127.0.0.1 8141 [put/get] localFileName\n\n");
+		printf("Usage: ./client <SERVER IP ADDRESS> <LISTENING PORT> <COMMAND> <FILE/DIR>\n");
+		printf("Example: ./client 127.0.0.1 8141 get remoteFileName\n./client 127.0.0.1 8141 [put/get/ls] [localFileName/dir]\n\n");
 		exit(1);
 	}
 
-	printf("client trying to connect to IP = %s PORT = %s method= %s for FILE= %s\n", argv[1], argv[2], argv[3], argv[4]);
+	printf("client trying to connect to IP = %s PORT = %s method= %s for FILE/DIR= %s\n", argv[1], argv[2], argv[3], argv[4]);
 
 	strcpy(fileName, argv[4]);
 
@@ -133,8 +133,65 @@ int main(int argc, char *argv[]) {
 		}
     } else if (!strcmp(argv[3], "ls")) {
         
-        printf("LS bitch");
+        sprintf(buffer, "ls /%s", fileName);
+		printf("-> ls /%s\n", fileName);
+
+		write(sockfd, buffer, strlen(buffer));
         
+        if (ret > 0) {
+			printf("<- %s\n", buffer);
+			if (!strcmp(buffer, "OK")) { // check if it is OK on the ftp server side
+
+				/*// open the file to be sent
+				filedesc = open(fileName, O_RDWR);
+
+				// get the size of the file to be sent
+				fstat(filedesc, &stat_buf);
+
+				// Read data from file and send it
+				ret = 0;
+				while (1) {
+					unsigned char buff[BUFSIZE] = { 0 };
+					int nread = read(filedesc, buff, BUFSIZE);
+					ret += nread;
+					printf("\nBytes read %d \n", nread);
+
+					// if read was success, send data.
+					if (nread > 0) {
+						printf("Sending \n");
+						write(sockfd, buff, nread);
+					}
+                    
+					// either there was error, or we reached end of file.	
+					if (nread < BUFSIZE) {
+						if (ret == stat_buf.st_size)
+							printf("End of file\n");
+						else
+							printf("Error reading\n");
+						break;
+					}
+				}
+
+				if (ret == -1) {
+					fprintf(stderr, "error sending the file\n");
+					exit(1);
+				}
+				if (ret != stat_buf.st_size) {
+					fprintf(stderr,
+							"incomplete transfer when sending: %lld of %d bytes\n",
+							ret, (int) stat_buf.st_size);
+					exit(1);
+				}*/
+			} else {
+				printf("ERROR on the server");
+			}
+
+			// close descriptor for file that was sent
+			close(filedesc);
+
+			// close socket descriptor
+			close(sockfd);
+		}        
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
