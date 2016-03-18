@@ -35,14 +35,11 @@ int main(int argc, char *argv[]) {
 
 	if (argc != 5) {
 		printf("Usage: ./client <SERVER IP ADDRESS> <LISTENING PORT>\n");
-		printf(
-				"Example: ./client 127.0.0.1 8141 get remoteFileName\n./client 127.0.0.1 8141 [put/get] localFileName\n\n");
+		printf("Example: ./client 127.0.0.1 8141 get remoteFileName\n./client 127.0.0.1 8141 [put/get] localFileName\n\n");
 		exit(1);
 	}
 
-	printf(
-			"client trying to connect to IP = %s PORT = %s method= %s for FILE= %s\n",
-			argv[1], argv[2], argv[3], argv[4]);
+	printf("client trying to connect to IP = %s PORT = %s method= %s for FILE= %s\n", argv[1], argv[2], argv[3], argv[4]);
 
 	strcpy(fileName, argv[4]);
 
@@ -56,9 +53,6 @@ int main(int argc, char *argv[]) {
 	// Connect tot he socket offered by the web server
 	if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
 		pexit("connect() failed");
-
-
-
 
 	if (!strcmp(argv[3], "get")) {
 
@@ -105,9 +99,8 @@ int main(int argc, char *argv[]) {
 						printf("Sending \n");
 						write(sockfd, buff, nread);
 					}
-
-					// either there was error, or we reached end of file.
-					
+                    
+					// either there was error, or we reached end of file.	
 					if (nread < BUFSIZE) {
 						if (ret == stat_buf.st_size)
 							printf("End of file\n");
@@ -115,7 +108,6 @@ int main(int argc, char *argv[]) {
 							printf("Error reading\n");
 						break;
 					}
-
 				}
 
 				if (ret == -1) {
@@ -137,15 +129,10 @@ int main(int argc, char *argv[]) {
 
 			// close socket descriptor
 			close(sockfd);
-
 		}
-
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
 	}
-
-
-
 	return 1;
 }
