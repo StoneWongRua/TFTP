@@ -1,6 +1,7 @@
 //
 //  client.c
 //  Adapted by Christophe Soares & Pedro Sobral on 15/16
+//  Adapted by Rafael Almeida on 2016
 //
 
 #include <stdio.h>
