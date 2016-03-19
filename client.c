@@ -132,66 +132,15 @@ int main(int argc, char *argv[]) {
 			close(sockfd);
 		}
     } else if (!strcmp(argv[3], "ls")) {
-        
-        sprintf(buffer, "ls /%s", fileName);
-		printf("-> ls /%s\n", fileName);
 
+		sprintf(buffer, "ls /%s", fileName);
+
+		// Now the sockfd can be used to communicate to the server the LS request
 		write(sockfd, buffer, strlen(buffer));
-        
-        if (ret > 0) {
-			printf("<- %s\n", buffer);
-			if (!strcmp(buffer, "OK")) { // check if it is OK on the ftp server side
 
-				/*// open the file to be sent
-				filedesc = open(fileName, O_RDWR);
+		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
+			write(1, buffer, i);
 
-				// get the size of the file to be sent
-				fstat(filedesc, &stat_buf);
-
-				// Read data from file and send it
-				ret = 0;
-				while (1) {
-					unsigned char buff[BUFSIZE] = { 0 };
-					int nread = read(filedesc, buff, BUFSIZE);
-					ret += nread;
-					printf("\nBytes read %d \n", nread);
-
-					// if read was success, send data.
-					if (nread > 0) {
-						printf("Sending \n");
-						write(sockfd, buff, nread);
-					}
-                    
-					// either there was error, or we reached end of file.	
-					if (nread < BUFSIZE) {
-						if (ret == stat_buf.st_size)
-							printf("End of file\n");
-						else
-							printf("Error reading\n");
-						break;
-					}
-				}
-
-				if (ret == -1) {
-					fprintf(stderr, "error sending the file\n");
-					exit(1);
-				}
-				if (ret != stat_buf.st_size) {
-					fprintf(stderr,
-							"incomplete transfer when sending: %lld of %d bytes\n",
-							ret, (int) stat_buf.st_size);
-					exit(1);
-				}*/
-			} else {
-				printf("ERROR on the server");
-			}
-
-			// close descriptor for file that was sent
-			close(filedesc);
-
-			// close socket descriptor
-			close(sockfd);
-		}        
 	} else {
 		// implement new methods
 		printf("unsuported method\n");

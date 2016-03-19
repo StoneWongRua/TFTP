@@ -77,9 +77,7 @@ int main(int argc, char **argv) {
 			pid = fork();
 			if(pid==0)
 			{
-				printf("Pedido atendido....\nPID: %d\n\n\n", getpid());
 				ftp(socketfd, hit);
-				printf("\n\n\nMy work here is done...\nGoodbye cruel world :(\n\n\n");
 			}
 			else
 			{
@@ -130,7 +128,7 @@ int ftp(int fd, int hit) {
 		// PUT
 		putFunction(fd,&buffer[5]);
 	} else if (!strncmp(buffer, "ls ", 2)) {
-		// PUT
+		// LS
 		lsFunction(fd,&buffer[5]);
 	}
 
@@ -180,26 +178,15 @@ void putFunction(int fd, char * fileName){
 }
 
 void lsFunction(int fd, char * fileName){
-	int file_fd;
-	long ret;
-	
-	static char buffer[BUFSIZE + 1]; /* static so zero filled */
-    
 	printf("LOG Header %s \n", fileName);
 
-	file_fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
-	if (file_fd == -1) {
-		sprintf(buffer, "ERROR");
-		write(fd, buffer, strlen(buffer));
-	} else {
-		sprintf(buffer, "OK");
-		write(fd, buffer, strlen(buffer));
-        
-        
-		sprintf(buffer, "Estou a enviar um LS");
-		write(fd, buffer, strlen(buffer));
+	dup2(fd, 1);
+	dup2(fd, 2);
 
-		/*while ((ret = read(fd, buffer, BUFSIZE)) > 0)
-			write(file_fd, buffer, ret);*/
+	if(strcmp(fileName,"")==0){
+		execlp("ls", "ls", ".", NULL);
+	} else {
+		execlp("ls", "ls", fileName, NULL);
 	}
+
 }
