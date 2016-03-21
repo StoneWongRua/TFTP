@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
 		}
     } else if (!strcmp(argv[3], "ls")) {
 
-		sprintf(buffer, "ls /%s", fileName);
+		sprintf(buffer, "ls %s", fileName);
 
 		// Now the sockfd can be used to communicate to the server the LS request
 		write(sockfd, buffer, strlen(buffer));

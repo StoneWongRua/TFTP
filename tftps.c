@@ -129,7 +129,7 @@ int ftp(int fd, int hit) {
 		putFunction(fd,&buffer[5]);
 	} else if (!strncmp(buffer, "ls ", 2)) {
 		// LS
-		lsFunction(fd,&buffer[5]);
+		lsFunction(fd,&buffer[3]);
 	}
 
 	sleep(1); /* allow socket to drain before signalling the socket is closed */
