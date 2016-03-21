@@ -2,7 +2,7 @@
 
 TFTP is a small and very safe mini ftp server. You can read more about it [here].
 
-This is the repo for my implementation of a TFTP server and it's respective client for the Operating Systems class.
+This is the repo for my implementation of a TFTP server and it's respective client for the Operating Systems class that I'm attending.
 
 ## Changelog
 - Server
