@@ -140,7 +140,20 @@ int main(int argc, char *argv[]) {
 
 		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
 			write(1, buffer, i);
+    } else if (!strcmp(argv[3], "mget")) {
+        
+        char buffAux[255];
 
+		sprintf(buffer, "mget %s", fileName);
+
+		// Now the sockfd can be used to communicate to the server the LS request
+		write(sockfd, buffer, strlen(buffer));
+
+		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
+        {
+			//write(buffAux[i], buffer, i);
+            printf("%d\n",i);
+        }
 	} else {
 		// implement new methods
 		printf("unsuported method\n");

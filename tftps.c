@@ -25,7 +25,9 @@ void getFunction(int fd, char * fileName);
 
 void putFunction(int fd, char * fileName);
 
-void lsFunction(int fd, char * fileName);
+void lsFunction(int fd, char * dirName);
+
+void mgetFunction(int fd, char * dirName);
 
 /* just checks command line arguments, setup a listening socket and block on accept waiting for clients */
 
@@ -130,6 +132,9 @@ int ftp(int fd, int hit) {
 	} else if (!strncmp(buffer, "ls ", 2)) {
 		// LS
 		lsFunction(fd,&buffer[3]);
+	} else if (!strncmp(buffer, "mget ", 4)) {
+		// MGET
+		mgetFunction(fd,&buffer[5]);
 	}
 
 	sleep(1); /* allow socket to drain before signalling the socket is closed */
@@ -148,7 +153,7 @@ void getFunction(int fd, char * fileName){
 		close(fd);
 	}
 	
-	printf("LOG SEND %s \n", fileName);
+	printf("GET -> LOG SEND %s \n", fileName);
 	
 	/* send file in 8KB block - last block may be smaller */
 	while ((ret = read(file_fd, buffer, BUFSIZE)) > 0) {
@@ -162,7 +167,7 @@ void putFunction(int fd, char * fileName){
 	
 	static char buffer[BUFSIZE + 1]; /* static so zero filled */
     
-	printf("LOG Header %s \n", fileName);
+	printf("PUT -> LOG Header %s \n", fileName);
 
 	file_fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 	if (file_fd == -1) {
@@ -177,16 +182,32 @@ void putFunction(int fd, char * fileName){
 	}
 }
 
-void lsFunction(int fd, char * fileName){
-	printf("LOG Header %s \n", fileName);
+void lsFunction(int fd, char * dirName){
+	printf("LS -> LOG Header %s \n", dirName);
 
 	dup2(fd, 1);
 	dup2(fd, 2);
 
-	if(strcmp(fileName,"")==0){
+	if(strcmp(dirName,"")==0){
 		execlp("ls", "ls", ".", NULL);
 	} else {
-		execlp("ls", "ls", fileName, NULL);
+		execlp("ls", "ls", dirName, NULL);
 	}
+}
 
+void mgetFunction(int fd, char * dirName)
+{
+    char path[255];
+    printf("MGET -> LOG Header %s \n", dirName);
+
+	dup2(fd, 1);
+	dup2(fd, 2);
+
+	if(strcmp(dirName,"")==0){
+        strcpy(path,"ls -l | wc -l");
+	} else {
+        sprintf(path, "ls -l %s | wc -l", dirName);
+	}
+        
+    execlp("/bin/sh" , "sh", "-c", path, NULL);
 }
