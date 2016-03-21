@@ -27,7 +27,7 @@ void putFunction(int fd, char * fileName);
 
 void lsFunction(int fd, char * dirName);
 
-void mgetFunction(int fd, char * dirName);
+void mgetFunction(int fd, char *dirName);
 
 /* just checks command line arguments, setup a listening socket and block on accept waiting for clients */
 
@@ -134,7 +134,7 @@ int ftp(int fd, int hit) {
 		lsFunction(fd,&buffer[3]);
 	} else if (!strncmp(buffer, "mget ", 4)) {
 		// MGET
-		mgetFunction(fd,&buffer[5]);
+		mgetFunction(fd, &buffer[5]);
 	}
 
 	sleep(1); /* allow socket to drain before signalling the socket is closed */
@@ -195,19 +195,32 @@ void lsFunction(int fd, char * dirName){
 	}
 }
 
-void mgetFunction(int fd, char * dirName)
+void mgetFunction(int fd, char *dirName)
 {
+	FILE *fp;
     char path[255];
-    printf("MGET -> LOG Header %s \n", dirName);
+    printf("MGET COUNT -> LOG Header %s \n", dirName);
+
+	if(strcmp(dirName,"")==0){
+        strcpy(path,"find . -type f -maxdepth 1 | wc -l");
+	} else {
+        sprintf(path, "find %s -type f -maxdepth 1 | wc -l", dirName);
+	}
+
+	fp = popen(path, "r");
+
+	while (fgets(path, sizeof(path), fp) != NULL) {
+		write(fd, path, strlen(path));
+	}
 
 	dup2(fd, 1);
 	dup2(fd, 2);
 
 	if(strcmp(dirName,"")==0){
-        strcpy(path,"ls -l | wc -l");
+		strcpy(path,"find . -type f -maxdepth 1");
 	} else {
-        sprintf(path, "ls -l %s | wc -l", dirName);
+		sprintf(path, "find %s -type f -maxdepth 1", dirName);
 	}
-        
-    execlp("/bin/sh" , "sh", "-c", path, NULL);
+
+	execlp("/bin/sh" , "sh", "-c", path, NULL);
 }

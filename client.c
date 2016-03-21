@@ -141,19 +141,29 @@ int main(int argc, char *argv[]) {
 		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
 			write(1, buffer, i);
     } else if (!strcmp(argv[3], "mget")) {
-        
-        char buffAux[255];
+
+		int j, cntAux = 0, numFiles;
+		char strAux[BUFSIZE];
 
 		sprintf(buffer, "mget %s", fileName);
-
-		// Now the sockfd can be used to communicate to the server the LS request
+		// Now the sockfd can be used to communicate to the server the mget request
 		write(sockfd, buffer, strlen(buffer));
 
-		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
-        {
-			//write(buffAux[i], buffer, i);
-            printf("%d\n",i);
-        }
+		read(sockfd, buffer, BUFSIZE);
+		numFiles = atoi(buffer);
+
+		read(sockfd, buffer, BUFSIZE);
+
+		for(j = 0; j<sizeof(buffer); j++)
+		{
+			strAux[j] = buffer[j];
+			if(buffer[j] == '\n')
+				cntAux++;
+			if(cntAux == numFiles)
+				break;
+		}
+
+		printf("%s\n\n",strAux);
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
