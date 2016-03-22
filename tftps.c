@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 
 #define BUFSIZE 8096
 
@@ -224,3 +225,5 @@ void mgetFunction(int fd, char *dirName)
 
 	execlp("/bin/sh" , "sh", "-c", path, NULL);
 }
+
+//Usar stat syscall no servidor, concatenar c/ | e ler no cliente

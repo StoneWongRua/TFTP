@@ -19,6 +19,8 @@
 
 #define BUFSIZE 8096
 
+void getFunction(char * buffer, int sockfd, char * fileName);
+
 int pexit(char * msg) {
 	perror(msg);
 	exit(1);
@@ -57,15 +59,7 @@ int main(int argc, char *argv[]) {
 
 	if (!strcmp(argv[3], "get")) {
 
-		sprintf(buffer, "get /%s", fileName);
-
-		// Now the sockfd can be used to communicate to the server the GET request
-		write(sockfd, buffer, strlen(buffer));
-
-		filedesc = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
-
-		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
-			write(filedesc, buffer, i);
+		getFunction(buffer, sockfd, fileName);
 
 	} else if (!strcmp(argv[3], "put")) {
 
@@ -169,4 +163,19 @@ int main(int argc, char *argv[]) {
 		printf("unsuported method\n");
 	}
 	return 1;
+}
+
+void getFunction(char * buffer, int sockfd, char * fileName)
+{
+	int i, filedesc;
+
+	sprintf(buffer, "get /%s", fileName);
+
+	// Now the sockfd can be used to communicate to the server the GET request
+	write(sockfd, buffer, strlen(buffer));
+
+	filedesc = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+
+	while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
+		write(filedesc, buffer, i);
 }
