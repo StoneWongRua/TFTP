@@ -19,7 +19,21 @@
 
 #define BUFSIZE 8096
 
+typedef struct {
+    char **data;
+    size_t used;
+    size_t size;
+} ARRAY;
+
 void getFunction(char * buffer, int sockfd, char * fileName);
+
+void serverResponse();
+
+void initArray(ARRAY *a, size_t initialSize);
+
+void insertArray(ARRAY *a, char * element);
+
+void freeArray(ARRAY *a); 
 
 int pexit(char * msg) {
 	perror(msg);
@@ -126,38 +140,59 @@ int main(int argc, char *argv[]) {
 			close(sockfd);
 		}
     } else if (!strcmp(argv[3], "ls")) {
-
-		sprintf(buffer, "ls %s", fileName);
+        char *token;
+		
+        sprintf(buffer, "ls %s", fileName);
 
 		// Now the sockfd can be used to communicate to the server the LS request
 		write(sockfd, buffer, strlen(buffer));
 
+        serverResponse();
+        
 		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
-			write(1, buffer, i);
+        {
+            token = strtok(buffer, "$$");
+            
+            while( token != NULL ) 
+            {
+                printf("%s\n", token);
+                
+                token = strtok(NULL, "$$");
+            }
+        }
     } else if (!strcmp(argv[3], "mget")) {
-
-		int j, cntAux = 0, numFiles;
-		char strAux[BUFSIZE];
-
+        char *token;
+        ARRAY arr;
+        int i, j;
+        
+        initArray(&arr,1);
+		
 		sprintf(buffer, "mget %s", fileName);
-		// Now the sockfd can be used to communicate to the server the mget request
+
+		// Now the sockfd can be used to communicate to the server the LS request
 		write(sockfd, buffer, strlen(buffer));
 
-		read(sockfd, buffer, BUFSIZE);
-		numFiles = atoi(buffer);
-
-		read(sockfd, buffer, BUFSIZE);
-
-		for(j = 0; j<sizeof(buffer); j++)
-		{
-			strAux[j] = buffer[j];
-			if(buffer[j] == '\n')
-				cntAux++;
-			if(cntAux == numFiles)
-				break;
-		}
-
-		printf("%s\n\n",strAux);
+        serverResponse();
+        
+		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
+        {
+            token = strtok(buffer, "$$");
+            
+            while( token != NULL ) 
+            {
+                printf("%s\n", token);
+                insertArray(&arr, token);
+                
+                token = strtok(NULL, "$$");
+            }
+        }
+        
+        for(j = 0;j < arr.used; j++)
+        {
+            printf("Str: %s \n\n",arr.data[j]);
+        }
+        
+        //freeArray(arr)
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
@@ -176,6 +211,59 @@ void getFunction(char * buffer, int sockfd, char * fileName)
 
 	filedesc = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 
+    serverResponse();
+    
 	while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
 		write(filedesc, buffer, i);
+}
+
+void serverResponse()
+{
+    printf("\nResposta do servidor:\n\n");
+}
+
+void initArray(ARRAY *a, size_t initialSize) {
+    a->data = malloc(initialSize * sizeof(char *));
+    if (a->data == NULL) {
+        printf("ERROR: Memory allocation failure!\n");
+        exit(1);
+    }
+    a->used = 0;
+    a->size = initialSize;
+}
+
+void insertArray(ARRAY *a, char * element) {
+    if(a->used == a->size) {
+        void *pointer;
+
+        a->size *= 2;
+        pointer  = realloc(a->data, a->size * sizeof(char *));
+        if (a->data == NULL) {
+            freeArray(a);
+
+            printf("ERROR: Memory allocation failure!\n");
+            exit(1);
+        }
+        a->data = pointer;
+    }
+    /* if the string passed is not NULL, copy it */
+    if (element != NULL) {
+        size_t length;
+
+        length           = strlen(element);
+        a->data[a->used] = malloc(1 + length);
+        if (a->data[a->used] != NULL)
+            strcpy(a->data[a->used++], element);
+    }
+    else
+        a->data[a->used++] = NULL;
+}
+
+void freeArray(ARRAY *a) {
+  size_t i;
+    /* Free all the copies of the strings */
+    for (i = 0 ; i < a->used ; ++i)
+        free(a->data[i]);
+    free(a->data);
+    free(a);
 }

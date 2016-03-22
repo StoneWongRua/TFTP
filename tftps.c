@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #define BUFSIZE 8096
 
@@ -25,6 +26,8 @@ int ftp(int fd, int hit);
 void getFunction(int fd, char * fileName);
 
 void putFunction(int fd, char * fileName);
+
+char * listFilesDir(char * dirName);
 
 void lsFunction(int fd, char * dirName);
 
@@ -185,45 +188,64 @@ void putFunction(int fd, char * fileName){
 
 void lsFunction(int fd, char * dirName){
 	printf("LS -> LOG Header %s \n", dirName);
-
-	dup2(fd, 1);
-	dup2(fd, 2);
-
-	if(strcmp(dirName,"")==0){
-		execlp("ls", "ls", ".", NULL);
-	} else {
-		execlp("ls", "ls", dirName, NULL);
-	}
+    
+    static char buffer[BUFSIZE + 1];
+    
+    sprintf(buffer, "%s", listFilesDir(dirName));
+    write(fd,buffer,BUFSIZE);
 }
 
 void mgetFunction(int fd, char *dirName)
 {
 	FILE *fp;
     char path[255];
+    
+    static char buffer[BUFSIZE + 1];
+    
     printf("MGET COUNT -> LOG Header %s \n", dirName);
+    
+    sprintf(buffer, "%s", listFilesDir(dirName));
+    write(fd,buffer,BUFSIZE);
 
-	if(strcmp(dirName,"")==0){
-        strcpy(path,"find . -type f -maxdepth 1 | wc -l");
-	} else {
-        sprintf(path, "find %s -type f -maxdepth 1 | wc -l", dirName);
-	}
-
-	fp = popen(path, "r");
-
-	while (fgets(path, sizeof(path), fp) != NULL) {
-		write(fd, path, strlen(path));
-	}
-
-	dup2(fd, 1);
-	dup2(fd, 2);
-
-	if(strcmp(dirName,"")==0){
+	/*if(strcmp(dirName,"")==0){
 		strcpy(path,"find . -type f -maxdepth 1");
 	} else {
 		sprintf(path, "find %s -type f -maxdepth 1", dirName);
 	}
 
-	execlp("/bin/sh" , "sh", "-c", path, NULL);
+	execlp("/bin/sh" , "sh", "-c", path, NULL);*/
 }
 
-//Usar stat syscall no servidor, concatenar c/ | e ler no cliente
+char * listFilesDir(char * dirName)
+{
+    DIR *midir;
+    struct dirent* info_archivo;
+    struct stat fileStat;
+    char fullpath[256];
+    char *files = malloc (sizeof (char) * BUFSIZE);
+    
+    if ((midir=opendir(dirName)) == NULL)
+    {
+        return "\nO directorio pedido não existe.\n";
+    }
+    
+    while ((info_archivo = readdir(midir)) != 0)
+    {
+        strcpy (fullpath, dirName);
+        strcat (fullpath, "/");
+        strcat (fullpath, info_archivo->d_name);
+        if (!stat(fullpath, &fileStat))
+        {
+            if(!S_ISDIR(fileStat.st_mode))
+            {
+                strcat (files, info_archivo->d_name);
+                strcat (files, "$$");
+            }
+        } else {
+            return "\nErro ao ler o directório.\n";
+        }
+    }
+    closedir(midir);
+    
+    return files;
+}
