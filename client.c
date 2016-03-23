@@ -14,6 +14,7 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -23,17 +24,17 @@ typedef struct {
     char **data;
     size_t used;
     size_t size;
-} ARRAY;
+} FILE_ARRAY;
 
 void getFunction(char * buffer, int sockfd, char * fileName);
 
 void serverResponse();
 
-void initArray(ARRAY *a, size_t initialSize);
+void initFileArray(FILE_ARRAY *a, size_t initialSize);
 
-void insertArray(ARRAY *a, char * element);
+void insertFileArray(FILE_ARRAY *a, char * element);
 
-void freeArray(ARRAY *a); 
+void freeFileArray(FILE_ARRAY *a);
 
 int pexit(char * msg) {
 	perror(msg);
@@ -162,10 +163,10 @@ int main(int argc, char *argv[]) {
         }
     } else if (!strcmp(argv[3], "mget")) {
         char *token;
-        ARRAY arr;
-        int i, j;
+        FILE_ARRAY fileArray;
+        int i, j, pid;
         
-        initArray(&arr,1);
+        initFileArray(&fileArray,1);
 		
 		sprintf(buffer, "mget %s", fileName);
 
@@ -181,18 +182,40 @@ int main(int argc, char *argv[]) {
             while( token != NULL ) 
             {
                 printf("%s\n", token);
-                insertArray(&arr, token);
+                insertFileArray(&fileArray, token);
                 
                 token = strtok(NULL, "$$");
             }
         }
         
-        for(j = 0;j < arr.used; j++)
+        int *pids = malloc(fileArray.used * sizeof(*pids));
+        
+        for(j = 0;j < fileArray.used; j++)
         {
-            printf("Str: %s \n\n", arr.data[j]);
+            if ((pid = fork()) == -1) {
+                perror(argv[0]); exit(1);
+            }
+            
+            if (pid == 0) {
+                getFunction(buffer, sockfd, fileArray.data[j]);
+                exit(j);
+            } else {
+                close(sockfd);
+                pids[j] = pid;
+            }
         }
         
-        freeArray(&arr);
+        for(j = 0;j < fileArray.used; j++)
+        {
+            int result;
+            waitpid(pids[j], &result, 0);
+            /*if (WIFEXITED(result)) {                                
+                printf("Pai - Soma recebida: %d.\nPID: %d.\n", WEXITSTATUS(result),pids[j]);
+            }*/
+            //printf("Str: %s PID: %d\n\n", fileArray.data[j], pids[j]);
+        }
+        
+        freeFileArray(&fileArray);
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
@@ -222,7 +245,7 @@ void serverResponse()
     printf("\nResposta do servidor:\n\n");
 }
 
-void initArray(ARRAY *a, size_t initialSize) {
+void initFileArray(FILE_ARRAY *a, size_t initialSize) {
     a->data = malloc(initialSize * sizeof(char *));
     if (a->data == NULL) {
         printf("ERROR: Memory allocation failure!\n");
@@ -232,14 +255,14 @@ void initArray(ARRAY *a, size_t initialSize) {
     a->size = initialSize;
 }
 
-void insertArray(ARRAY *a, char * element) {
+void insertFileArray(FILE_ARRAY *a, char * element) {
     if(a->used == a->size) {
         void *pointer;
 
         a->size *= 2;
         pointer  = realloc(a->data, a->size * sizeof(char *));
         if (a->data == NULL) {
-            freeArray(a);
+            freeFileArray(a);
 
             printf("ERROR: Memory allocation failure!\n");
             exit(1);
@@ -259,7 +282,7 @@ void insertArray(ARRAY *a, char * element) {
         a->data[a->used++] = NULL;
 }
 
-void freeArray(ARRAY *a) {
+void freeFileArray(FILE_ARRAY *a) {
     size_t i;
     /* Free all the copies of the strings */
     for (i = 0 ; i < a->used ; i++)

@@ -83,6 +83,7 @@ int main(int argc, char **argv) {
 			pid = fork();
 			if(pid==0)
 			{
+                printf("\n\nI'm a child\n\n");
 				ftp(socketfd, hit);
 			}
 			else
@@ -133,7 +134,7 @@ int ftp(int fd, int hit) {
 	} else if (!strncmp(buffer, "put ", 4)) {
 		// PUT
 		putFunction(fd,&buffer[5]);
-	} else if (!strncmp(buffer, "ls ", 2)) {
+	} else if (!strncmp(buffer, "ls ", 3)) {
 		// LS
 		lsFunction(fd,&buffer[3]);
 	} else if (!strncmp(buffer, "mget ", 4)) {
@@ -206,14 +207,6 @@ void mgetFunction(int fd, char *dirName)
     
     sprintf(buffer, "%s", listFilesDir(dirName));
     write(fd,buffer,BUFSIZE);
-
-	/*if(strcmp(dirName,"")==0){
-		strcpy(path,"find . -type f -maxdepth 1");
-	} else {
-		sprintf(path, "find %s -type f -maxdepth 1", dirName);
-	}
-
-	execlp("/bin/sh" , "sh", "-c", path, NULL);*/
 }
 
 char * listFilesDir(char * dirName)
