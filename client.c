@@ -189,10 +189,10 @@ int main(int argc, char *argv[]) {
         
         for(j = 0;j < arr.used; j++)
         {
-            printf("Str: %s \n\n",arr.data[j]);
+            printf("Str: %s \n\n", arr.data[j]);
         }
         
-        //freeArray(arr)
+        freeArray(&arr);
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
@@ -260,10 +260,11 @@ void insertArray(ARRAY *a, char * element) {
 }
 
 void freeArray(ARRAY *a) {
-  size_t i;
+    size_t i;
     /* Free all the copies of the strings */
-    for (i = 0 ; i < a->used ; ++i)
+    for (i = 0 ; i < a->used ; i++)
         free(a->data[i]);
     free(a->data);
+    a = NULL;
     free(a);
 }
