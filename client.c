@@ -26,6 +26,8 @@ typedef struct {
     size_t size;
 } FILE_ARRAY;
 
+int pexit(char * msg);
+
 void getFunction(char * buffer, int sockfd, char * fileName);
 
 void initFileArray(FILE_ARRAY *a, size_t initialSize);
@@ -33,11 +35,6 @@ void initFileArray(FILE_ARRAY *a, size_t initialSize);
 void insertFileArray(FILE_ARRAY *a, char * element);
 
 void freeFileArray(FILE_ARRAY *a);
-
-int pexit(char * msg) {
-	perror(msg);
-	exit(1);
-}
 
 int main(int argc, char *argv[]) {
 	int i, sockfd, filedesc;
@@ -71,8 +68,12 @@ int main(int argc, char *argv[]) {
 		pexit("connect() failed");
 
 	if (!strcmp(argv[3], "get")) {
+        
+        printf("\n\n-------------------------\n| A começar download... |\n-------------------------\n\n");
 
 		getFunction(buffer, sockfd, fileName);
+        
+        printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
 
 	} else if (!strcmp(argv[3], "put")) {
 
@@ -184,6 +185,8 @@ int main(int argc, char *argv[]) {
         
         int *pids = malloc(fileArray.used * sizeof(*pids));
         
+        printf("\n\n--------------------------------------------------------\n| Foram encontrados %d ficheiros. A começar download... |\n--------------------------------------------------------\n\n", (int) fileArray.used);
+        
         for(j = 0;j < (int) fileArray.used; j++)
         {
             if ((pid = fork()) == -1) {
@@ -192,19 +195,27 @@ int main(int argc, char *argv[]) {
             
             if (pid == 0) {
                 int sockfdAux;
-	            //static struct sockaddr_in serv_addr;
+                struct timeval beginTimeAux, endTimeAux;
+                unsigned long long int elapsedTime;
+                
                 if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
                     pexit("socket() failed");
 
                 // Connect tot he socket offered by the web server
                 if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
                     pexit("connect() failed");
-                    
+                 
+                gettimeofday(&beginTimeAux, NULL);
+                
                 getFunction(buffer, sockfdAux, fileArray.data[j]);
+                
+                gettimeofday(&endTimeAux, NULL);
                 
                 close(sockfdAux);
                 
-                printf("O ficheiro pedido: %s foi recebido!\n\n",fileArray.data[j]);
+                elapsedTime = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+                
+                printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTime);
                 
                 exit(j);
             } else {
@@ -212,7 +223,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        for(j = 0;j < fileArray.used; j++)
+        for(j = 0;j < (int) fileArray.used; j++)
         {
             int result;
             waitpid(pids[j], &result, 0);
@@ -290,4 +301,9 @@ void freeFileArray(FILE_ARRAY *a) {
     free(a->data);
     a = NULL;
     free(a);
+}
+
+int pexit(char * msg) {
+	perror(msg);
+	exit(1);
 }
