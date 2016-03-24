@@ -28,8 +28,6 @@ typedef struct {
 
 void getFunction(char * buffer, int sockfd, char * fileName);
 
-void serverResponse();
-
 void initFileArray(FILE_ARRAY *a, size_t initialSize);
 
 void insertFileArray(FILE_ARRAY *a, char * element);
@@ -147,8 +145,6 @@ int main(int argc, char *argv[]) {
 
 		// Now the sockfd can be used to communicate to the server the LS request
 		write(sockfd, buffer, strlen(buffer));
-
-        serverResponse();
         
 		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
         {
@@ -172,8 +168,6 @@ int main(int argc, char *argv[]) {
 
 		// Now the sockfd can be used to communicate to the server the LS request
 		write(sockfd, buffer, strlen(buffer));
-
-        serverResponse();
         
 		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
         {
@@ -181,7 +175,7 @@ int main(int argc, char *argv[]) {
             
             while( token != NULL ) 
             {
-                printf("%s\n", token);
+                //printf("%s\n", token);
                 insertFileArray(&fileArray, token);
                 
                 token = strtok(NULL, "$$");
@@ -190,17 +184,30 @@ int main(int argc, char *argv[]) {
         
         int *pids = malloc(fileArray.used * sizeof(*pids));
         
-        for(j = 0;j < fileArray.used; j++)
+        for(j = 0;j < (int) fileArray.used; j++)
         {
             if ((pid = fork()) == -1) {
                 perror(argv[0]); exit(1);
             }
             
             if (pid == 0) {
-                getFunction(buffer, sockfd, fileArray.data[j]);
+                int sockfdAux;
+	            //static struct sockaddr_in serv_addr;
+                if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+                    pexit("socket() failed");
+
+                // Connect tot he socket offered by the web server
+                if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+                    pexit("connect() failed");
+                    
+                getFunction(buffer, sockfdAux, fileArray.data[j]);
+                
+                close(sockfdAux);
+                
+                printf("O ficheiro pedido: %s foi recebido!\n\n",fileArray.data[j]);
+                
                 exit(j);
             } else {
-                close(sockfd);
                 pids[j] = pid;
             }
         }
@@ -234,15 +241,8 @@ void getFunction(char * buffer, int sockfd, char * fileName)
 
 	filedesc = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 
-    serverResponse();
-    
 	while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
 		write(filedesc, buffer, i);
-}
-
-void serverResponse()
-{
-    printf("\nResposta do servidor:\n\n");
 }
 
 void initFileArray(FILE_ARRAY *a, size_t initialSize) {
