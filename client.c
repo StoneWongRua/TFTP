@@ -234,6 +234,8 @@ int main(int argc, char *argv[]) {
         }
         
         freeFileArray(&fileArray);
+        
+        printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
