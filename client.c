@@ -162,6 +162,10 @@ int main(int argc, char *argv[]) {
         char *token;
         FILE_ARRAY fileArray;
         int i, j, pid;
+        struct timeval beginTime, endTime;
+        unsigned long long int elapsedTime;
+        
+        gettimeofday(&beginTime, NULL);
         
         initFileArray(&fileArray,1);
 		
@@ -196,7 +200,9 @@ int main(int argc, char *argv[]) {
             if (pid == 0) {
                 int sockfdAux;
                 struct timeval beginTimeAux, endTimeAux;
-                unsigned long long int elapsedTime;
+                unsigned long long int elapsedTimeAux;
+                 
+                gettimeofday(&beginTimeAux, NULL);
                 
                 if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
                     pexit("socket() failed");
@@ -204,18 +210,16 @@ int main(int argc, char *argv[]) {
                 // Connect tot he socket offered by the web server
                 if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
                     pexit("connect() failed");
-                 
-                gettimeofday(&beginTimeAux, NULL);
                 
                 getFunction(buffer, sockfdAux, fileArray.data[j]);
                 
-                gettimeofday(&endTimeAux, NULL);
-                
                 close(sockfdAux);
                 
-                elapsedTime = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+                gettimeofday(&endTimeAux, NULL);
                 
-                printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTime);
+                elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+                
+                printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
                 
                 exit(j);
             } else {
@@ -227,15 +231,17 @@ int main(int argc, char *argv[]) {
         {
             int result;
             waitpid(pids[j], &result, 0);
-            /*if (WIFEXITED(result)) {                                
-                printf("Pai - Soma recebida: %d.\nPID: %d.\n", WEXITSTATUS(result),pids[j]);
-            }*/
-            //printf("Str: %s PID: %d\n\n", fileArray.data[j], pids[j]);
         }
         
         freeFileArray(&fileArray);
         
         printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
+                
+        gettimeofday(&endTime, NULL);
+        
+        elapsedTime = (endTime.tv_sec-beginTime.tv_sec)*1000000 + endTime.tv_usec-beginTime.tv_usec;
+                
+        printf("Demorei %llu microsegundos.\n\n",elapsedTime);
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
