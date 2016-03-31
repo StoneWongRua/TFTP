@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
 	// Main LOOP
 	for (hit = 1 ;; hit++) {
 		length = sizeof(cli_addr);
-        
+
 		/* block waiting for clients */
 		socketfd = accept(listenfd, (struct sockaddr *) &cli_addr, &length);
 		if (socketfd < 0)
@@ -128,10 +128,7 @@ void *attendFTP(void *argp)
 {
 	struct thread_args *args = argp;
 
-	int fd = args->fd;
-	int hit = args->hit;
-
-    ftp(fd, hit);
+    ftp(args->fd, args->hit);
 
     free(args);
     return NULL;
