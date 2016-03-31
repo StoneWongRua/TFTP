@@ -23,7 +23,15 @@
 #define BUFSIZE 8096
 #define OperationMode 1
 
-void *attendFTP(int fd, int hit);
+
+#ifdef OperationMode
+	struct thread_args {
+		int fd;
+		int hit;
+	};
+#endif
+
+void *attendFTP(void *);
 
 int ftp(int fd, int hit);
 
@@ -78,24 +86,28 @@ int main(int argc, char **argv) {
 	// Main LOOP
 	for (hit = 1 ;; hit++) {
 		length = sizeof(cli_addr);
+        
 		/* block waiting for clients */
 		socketfd = accept(listenfd, (struct sockaddr *) &cli_addr, &length);
 		if (socketfd < 0)
 			printf("ERROR system call - accept error\n");
 		else
 		{
-            if(OperationMode)
-            {
+			#ifdef OperationMode
                 pthread_t thread_id;
-                
-                if(pthread_create(&thread_id, NULL, attendFTP(socketfd, hit), NULL))
-                {
-                    perror("could not create thread");
-                    return 1;
+
+                struct thread_args *args = malloc(sizeof *args);
+
+                args->fd = socketfd;
+                args->hit = hit;
+
+                if (args != NULL) {
+                    if (pthread_create(&thread_id, NULL, &attendFTP, args)) {
+                        perror("could not create thread");
+                        return 1;
+                    }
                 }
-            }
-            else
-            {
+            #else
                 pid = fork();
                 if(pid==0)
                 {
@@ -106,16 +118,23 @@ int main(int argc, char **argv) {
                     //Temos de fechar o socketfd para que seja apenas a child a tratar dos pedidos, caso contrário iria ficar aqui pendurado
                     close(socketfd);
                     kill(pid, SIGCHLD);
-                }   
-            }
+                }
+            #endif
 		}
 	}
 }
 
-void *attendFTP(int fd, int hit)
+void *attendFTP(void *argp)
 {
+	struct thread_args *args = argp;
+
+	int fd = args->fd;
+	int hit = args->hit;
+
     ftp(fd, hit);
-    return 0;
+
+    free(args);
+    return NULL;
 }
 
 /* this is the ftp server function */
