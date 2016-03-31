@@ -18,8 +18,12 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <pthread.h>
 
 #define BUFSIZE 8096
+#define OperationMode 1
+
+void *attendFTP(int fd, int hit);
 
 int ftp(int fd, int hit);
 
@@ -80,19 +84,38 @@ int main(int argc, char **argv) {
 			printf("ERROR system call - accept error\n");
 		else
 		{
-			pid = fork();
-			if(pid==0)
-			{
-				ftp(socketfd, hit);
-			}
-			else
-			{
-				//Temos de fechar o socketfd para que seja apenas a child a tratar dos pedidos, caso contrário iria ficar aqui pendurado
-				close(socketfd);
-				kill(pid, SIGCHLD);
-			}
+            if(OperationMode)
+            {
+                pthread_t thread_id;
+                
+                if(pthread_create(&thread_id, NULL, attendFTP(socketfd, hit), NULL))
+                {
+                    perror("could not create thread");
+                    return 1;
+                }
+            }
+            else
+            {
+                pid = fork();
+                if(pid==0)
+                {
+                    ftp(socketfd, hit);
+                }
+                else
+                {
+                    //Temos de fechar o socketfd para que seja apenas a child a tratar dos pedidos, caso contrário iria ficar aqui pendurado
+                    close(socketfd);
+                    kill(pid, SIGCHLD);
+                }   
+            }
 		}
 	}
+}
+
+void *attendFTP(int fd, int hit)
+{
+    ftp(fd, hit);
+    return 0;
 }
 
 /* this is the ftp server function */
