@@ -23,15 +23,14 @@
 #define BUFSIZE 8096
 #define OperationMode 1
 
-
-#ifdef OperationMode
-	struct thread_args {
+#if OperationMode
+	typedef struct {
 		int fd;
 		int hit;
-	};
-#endif
+	} THREAD_ARGS;
 
-void *attendFTP(void *);
+    void *attendFTP(void *);
+#endif
 
 int ftp(int fd, int hit);
 
@@ -93,10 +92,10 @@ int main(int argc, char **argv) {
 			printf("ERROR system call - accept error\n");
 		else
 		{
-			#ifdef OperationMode
+			#if OperationMode            
                 pthread_t thread_id;
-
-                struct thread_args *args = malloc(sizeof *args);
+    
+                THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
 
                 args->fd = socketfd;
                 args->hit = hit;
@@ -107,14 +106,13 @@ int main(int argc, char **argv) {
                         return 1;
                     }
                 }
+                
+                //pthread_join(thread_id,NULL);
             #else
                 pid = fork();
-                if(pid==0)
-                {
+                if(pid==0) {
                     ftp(socketfd, hit);
-                }
-                else
-                {
+                } else {
                     //Temos de fechar o socketfd para que seja apenas a child a tratar dos pedidos, caso contrário iria ficar aqui pendurado
                     close(socketfd);
                     kill(pid, SIGCHLD);
@@ -124,15 +122,20 @@ int main(int argc, char **argv) {
 	}
 }
 
-void *attendFTP(void *argp)
-{
-	struct thread_args *args = argp;
+#if OperationMode
+	void *attendFTP(void *argp) {
+        THREAD_ARGS *args = argp;
+        
+        int sock = args->fd;
 
-    ftp(args->fd, args->hit);
+        ftp(sock, args->hit);
 
-    free(args);
-    return NULL;
-}
+        free(args);
+        printf("Thread executou\n\n");
+        pthread_exit(NULL);
+        return NULL;
+    }
+#endif
 
 /* this is the ftp server function */
 int ftp(int fd, int hit) {
@@ -193,7 +196,11 @@ void getFunction(int fd, char * fileName){
 
 	if ((file_fd = open(fileName, O_RDONLY)) == -1) { /* open the file for reading */
 		printf("ERROR failed to open file %s\n", fileName);
+        printf("Err: %d\n\n",errno);
+        sprintf(buffer, "%s", "erro");
+        write(fd,buffer,BUFSIZE);
 		close(fd);
+        return;
 	}
 	
 	printf("GET -> LOG SEND %s \n", fileName);

@@ -6,7 +6,7 @@ This is the repo for my implementation of a TFTP server and it's respective clie
 
 ## Changelog
 - Server
-    - Launches a child process for each file request or a thread for each file request
+    - Launches a child process for each file request or a thread for each file request, depending on your OperationMode flag (1 for threads, 0 for forks)
 - Client
     - Launches a fork for each GET ou PUT
     - Remote ls (list) all files in given dir, using forks

@@ -19,6 +19,14 @@
 #include <arpa/inet.h>
 
 #define BUFSIZE 8096
+#define OperationMode 0
+
+#if OperationMode
+	typedef struct {
+		int fd;
+		int hit;
+	} THREAD_ARGS;
+#endif
 
 typedef struct {
     char **data;
@@ -35,6 +43,8 @@ void initFileArray(FILE_ARRAY *a, size_t initialSize);
 void insertFileArray(FILE_ARRAY *a, char * element);
 
 void freeFileArray(FILE_ARRAY *a);
+
+int *downloadFlag = 0;
 
 int main(int argc, char *argv[]) {
 	int i, sockfd, filedesc;
@@ -191,49 +201,54 @@ int main(int argc, char *argv[]) {
         
         printf("\n\n--------------------------------------------------------\n| Foram encontrados %d ficheiros. A começar download... |\n--------------------------------------------------------\n\n", (int) fileArray.used);
         
-        for(j = 0;j < (int) fileArray.used; j++)
-        {
-            if ((pid = fork()) == -1) {
-                perror(argv[0]); exit(1);
+        #if OperationMode
+        
+        
+        #else
+            for(j = 0;j < (int) fileArray.used; j++)
+            {
+                if ((pid = fork()) == -1) {
+                    perror(argv[0]); exit(1);
+                }
+                
+                if (pid == 0) {
+                    int sockfdAux;
+                    struct timeval beginTimeAux, endTimeAux;
+                    unsigned long long int elapsedTimeAux;
+                    
+                    gettimeofday(&beginTimeAux, NULL);
+                    
+                    if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+                        pexit("socket() failed");
+
+                    // Connect tot he socket offered by the web server
+                    if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+                        pexit("connect() failed");
+                    
+                    getFunction(buffer, sockfdAux, fileArray.data[j]);
+                    
+                    close(sockfdAux);
+                    
+                    gettimeofday(&endTimeAux, NULL);
+                    
+                    elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+                    
+                    printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
+                    
+                    exit(j);
+                } else {
+                    pids[j] = pid;
+                }
             }
             
-            if (pid == 0) {
-                int sockfdAux;
-                struct timeval beginTimeAux, endTimeAux;
-                unsigned long long int elapsedTimeAux;
-                 
-                gettimeofday(&beginTimeAux, NULL);
-                
-                if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-                    pexit("socket() failed");
-
-                // Connect tot he socket offered by the web server
-                if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-                    pexit("connect() failed");
-                
-                getFunction(buffer, sockfdAux, fileArray.data[j]);
-                
-                close(sockfdAux);
-                
-                gettimeofday(&endTimeAux, NULL);
-                
-                elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
-                
-                printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
-                
-                exit(j);
-            } else {
-                pids[j] = pid;
+            for(j = 0;j < (int) fileArray.used; j++)
+            {
+                int result;
+                waitpid(pids[j], &result, 0);
             }
-        }
-        
-        for(j = 0;j < (int) fileArray.used; j++)
-        {
-            int result;
-            waitpid(pids[j], &result, 0);
-        }
-        
-        freeFileArray(&fileArray);
+            
+            freeFileArray(&fileArray);
+        #endif
         
         printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
                 
@@ -261,7 +276,14 @@ void getFunction(char * buffer, int sockfd, char * fileName)
 	filedesc = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 
 	while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
-		write(filedesc, buffer, i);
+    {
+        if(strcmp(buffer,"erro") == 0)
+        {
+            printf("Ocorreu um erro ao tentar abrir o ficheiro\n\n");
+        } else {
+            write(filedesc, buffer, i);
+        }
+    }
 }
 
 void initFileArray(FILE_ARRAY *a, size_t initialSize) {
