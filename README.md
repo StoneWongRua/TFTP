@@ -6,10 +6,11 @@ This is the repo for my implementation of a TFTP server and it's respective clie
 
 ## Changelog
 - Server
-    - Launches a child process for each file request
+    - Launches a child process for each file request or a thread for each file request
 - Client
-    - Remote ls (list) all files in given dir
-    - Remote mget (multiple get) - retrieves every file in the given dir
+    - Launches a fork for each GET ou PUT
+    - Remote ls (list) all files in given dir, using forks
+    - Remote mget (multiple get) - retrieves every file in the given dir, using forks
     - Elapsed time in microseconds
 
 ## Initial functionalities
