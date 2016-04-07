@@ -25,7 +25,7 @@
 
 #if OperationMode
 	typedef struct {
-		int fd;
+		int * fd;
 		int hit;
 	} THREAD_ARGS;
 
@@ -97,9 +97,9 @@ int main(int argc, char **argv) {
     
                 THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
 
-				int sockAUX = (int) malloc(sizeof(int));
+				int * sockAUX = (int *) malloc(sizeof(int *));
 
-				sockAUX = socketfd;
+				*sockAUX = socketfd;
 
                 args->fd = sockAUX;
                 args->hit = hit;
@@ -110,8 +110,6 @@ int main(int argc, char **argv) {
                         return 1;
                     }
                 }
-                
-                //pthread_join(thread_id,NULL);
             #else
                 pid = fork();
                 if(pid==0) {
@@ -130,15 +128,16 @@ int main(int argc, char **argv) {
 	void *attendFTP(void *argp) {
         THREAD_ARGS *args = argp;
         
-        int sock = args->fd;
+        int sock = *args->fd;
 
 		printf("FD SOCK: %d\n\n", sock);
 
         ftp(sock, args->hit);
 
         free(args);
-        //printf("Thread executou\n\n");
+        
         pthread_exit(NULL);
+        
         return NULL;
     }
 #endif
@@ -148,7 +147,7 @@ int ftp(int fd, int hit) {
 	int j, file_fd, filedesc;
 	long i, ret, len;
 	char * fstr;
-	static char buffer[BUFSIZE + 1]; /* static so zero filled */
+	/*static*/ char buffer[BUFSIZE + 1] = {0}; /* static so zero filled */
 
 	printf("FD: %d\n\n", fd);
 
@@ -202,7 +201,7 @@ void getFunction(int fd, char * fileName){
 
 	printf("FD GET: %d\n\n", fd);
 
-	static char buffer[BUFSIZE + 1]; /* static so zero filled */
+	/*static*/ char buffer[BUFSIZE + 1] = {0}; /* static so zero filled */
 
 	if ((file_fd = open(fileName, O_RDONLY)) == -1) { /* open the file for reading */
 		printf("ERROR failed to open file %s\n", fileName);
