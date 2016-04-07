@@ -21,13 +21,6 @@
 #define BUFSIZE 8096
 #define OperationMode 0
 
-#if OperationMode
-	typedef struct {
-		int fd;
-		int hit;
-	} THREAD_ARGS;
-#endif
-
 typedef struct {
     char **data;
     size_t used;
@@ -36,6 +29,7 @@ typedef struct {
 
 int pexit(char * msg);
 
+//void getFunction(char * buffer, int sockfd, char * fileName, int *downloadFlag);
 void getFunction(char * buffer, int sockfd, char * fileName);
 
 void initFileArray(FILE_ARRAY *a, size_t initialSize);
@@ -44,10 +38,10 @@ void insertFileArray(FILE_ARRAY *a, char * element);
 
 void freeFileArray(FILE_ARRAY *a);
 
-int *downloadFlag = 0;
-
 int main(int argc, char *argv[]) {
 	int i, sockfd, filedesc;
+    //int downloadFlag = 0;
+
 	long long ret = 0, offset = 0;
 	char buffer[BUFSIZE];
 	static struct sockaddr_in serv_addr;
@@ -81,9 +75,8 @@ int main(int argc, char *argv[]) {
         
         printf("\n\n-------------------------\n| A começar download... |\n-------------------------\n\n");
 
+		//getFunction(buffer, sockfd, fileName, &downloadFlag);
 		getFunction(buffer, sockfd, fileName);
-        
-        printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
 
 	} else if (!strcmp(argv[3], "put")) {
 
@@ -160,11 +153,11 @@ int main(int argc, char *argv[]) {
 		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
         {
             token = strtok(buffer, "$$");
-            
-            while( token != NULL ) 
+
+            while( token != NULL )
             {
                 printf("%s\n", token);
-                
+
                 token = strtok(NULL, "$$");
             }
         }
@@ -196,14 +189,13 @@ int main(int argc, char *argv[]) {
                 token = strtok(NULL, "$$");
             }
         }
-        
+
         int *pids = malloc(fileArray.used * sizeof(*pids));
         
         printf("\n\n--------------------------------------------------------\n| Foram encontrados %d ficheiros. A começar download... |\n--------------------------------------------------------\n\n", (int) fileArray.used);
         
         #if OperationMode
-        
-        
+
         #else
             for(j = 0;j < (int) fileArray.used; j++)
             {
@@ -225,16 +217,18 @@ int main(int argc, char *argv[]) {
                     if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
                         pexit("connect() failed");
                     
+                    //getFunction(buffer, sockfdAux, fileArray.data[j], &downloadFlag);
                     getFunction(buffer, sockfdAux, fileArray.data[j]);
-                    
+
                     close(sockfdAux);
                     
                     gettimeofday(&endTimeAux, NULL);
                     
                     elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
-                    
-                    printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
-                    
+
+                    //if(downloadFlag)
+                        printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
+
                     exit(j);
                 } else {
                     pids[j] = pid;
@@ -249,8 +243,11 @@ int main(int argc, char *argv[]) {
             
             freeFileArray(&fileArray);
         #endif
-        
-        printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
+
+        //printf("int; %d\n\n\n", downloadFlag);
+
+        //if(downloadFlag)
+            printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
                 
         gettimeofday(&endTime, NULL);
         
@@ -264,6 +261,7 @@ int main(int argc, char *argv[]) {
 	return 1;
 }
 
+//void getFunction(char * buffer, int sockfd, char * fileName, int * downloadFlag)
 void getFunction(char * buffer, int sockfd, char * fileName)
 {
 	int i, filedesc;
@@ -280,8 +278,10 @@ void getFunction(char * buffer, int sockfd, char * fileName)
         if(strcmp(buffer,"erro") == 0)
         {
             printf("Ocorreu um erro ao tentar abrir o ficheiro\n\n");
+            //*downloadFlag = 0;
         } else {
             write(filedesc, buffer, i);
+            //*downloadFlag = 1;
         }
     }
 }

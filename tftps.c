@@ -97,7 +97,11 @@ int main(int argc, char **argv) {
     
                 THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
 
-                args->fd = socketfd;
+				int sockAUX = (int) malloc(sizeof(int));
+
+				sockAUX = socketfd;
+
+                args->fd = sockAUX;
                 args->hit = hit;
 
                 if (args != NULL) {
@@ -128,10 +132,12 @@ int main(int argc, char **argv) {
         
         int sock = args->fd;
 
+		printf("FD SOCK: %d\n\n", sock);
+
         ftp(sock, args->hit);
 
         free(args);
-        printf("Thread executou\n\n");
+        //printf("Thread executou\n\n");
         pthread_exit(NULL);
         return NULL;
     }
@@ -143,6 +149,8 @@ int ftp(int fd, int hit) {
 	long i, ret, len;
 	char * fstr;
 	static char buffer[BUFSIZE + 1]; /* static so zero filled */
+
+	printf("FD: %d\n\n", fd);
 
 	ret = read(fd, buffer, BUFSIZE); // read FTP request
 
@@ -191,6 +199,8 @@ int ftp(int fd, int hit) {
 void getFunction(int fd, char * fileName){
 	int file_fd;
 	long ret;
+
+	printf("FD GET: %d\n\n", fd);
 
 	static char buffer[BUFSIZE + 1]; /* static so zero filled */
 
