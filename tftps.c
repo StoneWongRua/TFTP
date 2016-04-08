@@ -130,8 +130,6 @@ int main(int argc, char **argv) {
         
         int sock = *args->fd;
 
-		printf("FD SOCK: %d\n\n", sock);
-
         ftp(sock, args->hit);
 
         free(args);
