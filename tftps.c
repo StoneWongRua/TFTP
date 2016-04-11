@@ -222,7 +222,7 @@ void putFunction(int fd, char * fileName){
 	int file_fd;
 	long ret;
 	
-	static char buffer[BUFSIZE + 1]; /* static so zero filled */
+	/*static*/ char buffer[BUFSIZE + 1] = {0}; /* static so zero filled */
     
 	printf("PUT -> LOG Header %s \n", fileName);
 
