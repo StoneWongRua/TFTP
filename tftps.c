@@ -130,9 +130,9 @@ int main(int argc, char **argv) {
         
         int sock = *args->fd;
 
-		printf("FD SOCK: %d\n\n", sock);
-
         ftp(sock, args->hit);
+
+		free(args->fd);
 
         free(args);
         
@@ -147,9 +147,7 @@ int ftp(int fd, int hit) {
 	int j, file_fd, filedesc;
 	long i, ret, len;
 	char * fstr;
-	/*static*/ char buffer[BUFSIZE + 1] = {0}; /* static so zero filled */
-
-	printf("FD: %d\n\n", fd);
+	char buffer[BUFSIZE + 1] = {0};
 
 	ret = read(fd, buffer, BUFSIZE); // read FTP request
 
