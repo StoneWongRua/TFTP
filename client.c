@@ -276,7 +276,7 @@ int main(int argc, char *argv[]) {
 
         gettimeofday(&endTime, NULL);
 
-        elapsedTime = (endTime.tv_sec-beginTime.tv_sec)*1000000 + endTime.tv_usec-beginTime.tv_usec;
+        elapsedTime = (unsigned long long) (endTime.tv_sec-beginTime.tv_sec)*1000000 + endTime.tv_usec-beginTime.tv_usec;
 
         printf("Demorei %llu microsegundos.\n\n",elapsedTime);
 	} else {
@@ -388,7 +388,7 @@ void *attendGET(void *argp) {
 
     gettimeofday(&endTimeAux, NULL);
 
-    elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+    elapsedTimeAux = (unsigned long long) (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
 
     //if(downloadFlag)
     printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",args->fileName, elapsedTimeAux);
