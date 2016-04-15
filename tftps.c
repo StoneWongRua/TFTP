@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #define BUFSIZE 8096
 #define OperationMode 1
