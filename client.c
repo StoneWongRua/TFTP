@@ -42,6 +42,12 @@ int pexit(char * msg);
 //void getFunction(char * buffer, int sockfd, char * fileName, int *downloadFlag);
 void getFunction(char * buffer, int sockfd, char * fileName);
 
+void putFunction (char * buffer, int sockfd, int filedesc, char * fileName, long long ret, struct stat stat_buf);
+
+void lsFunction(char * buffer, int sockfd, char * fileName);
+
+void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in serv_addr);
+
 void initFileArray(FILE_ARRAY *a, size_t initialSize);
 
 void insertFileArray(FILE_ARRAY *a, char * element);
@@ -89,196 +95,33 @@ int main(int argc, char *argv[]) {
 		getFunction(buffer, sockfd, fileName);
 
 	} else if (!strcmp(argv[3], "put")) {
-
-		sprintf(buffer, "put /%s", fileName);
-		printf("-> put /%s\n", fileName);
-
-		write(sockfd, buffer, strlen(buffer));
-
-		ret = read(sockfd, buffer, BUFSIZE); 	// read Web request in one go
-		buffer[ret] = 0; 						// put a null at the end
-
-		if (ret > 0) {
-			printf("<- %s\n", buffer);
-			if (!strcmp(buffer, "OK")) { // check if it is OK on the ftp server side
-
-				// open the file to be sent
-				filedesc = open(fileName, O_RDWR);
-
-				// get the size of the file to be sent
-				fstat(filedesc, &stat_buf);
-
-				// Read data from file and send it
-				ret = 0;
-				while (1) {
-					unsigned char buff[BUFSIZE] = { 0 };
-					int nread = read(filedesc, buff, BUFSIZE);
-					ret += nread;
-					printf("\nBytes read %d \n", nread);
-
-					// if read was success, send data.
-					if (nread > 0) {
-						printf("Sending \n");
-						write(sockfd, buff, nread);
-					}
-
-					// either there was error, or we reached end of file.
-					if (nread < BUFSIZE) {
-						if (ret == stat_buf.st_size)
-							printf("End of file\n");
-						else
-							printf("Error reading\n");
-						break;
-					}
-				}
-
-				if (ret == -1) {
-					fprintf(stderr, "error sending the file\n");
-					exit(1);
-				}
-				if (ret != stat_buf.st_size) {
-					fprintf(stderr,
-							"incomplete transfer when sending: %lld of %d bytes\n",
-							ret, (int) stat_buf.st_size);
-					exit(1);
-				}
-			} else {
-				printf("ERROR on the server");
-			}
-
-			// close descriptor for file that was sent
-			close(filedesc);
-
-			// close socket descriptor
-			close(sockfd);
-		}
+        putFunction(buffer, sockfd, filedesc, fileName, ret, stat_buf);
     } else if (!strcmp(argv[3], "ls")) {
-        char *token;
-
-        sprintf(buffer, "ls %s", fileName);
-
-		// Now the sockfd can be used to communicate to the server the LS request
-		write(sockfd, buffer, strlen(buffer));
-
-		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
-        {
-            token = strtok(buffer, "$$");
-
-            while( token != NULL )
-            {
-                printf("%s\n", token);
-
-                token = strtok(NULL, "$$");
-            }
-        }
+        lsFunction(buffer,sockfd,fileName);
     } else if (!strcmp(argv[3], "mget")) {
+        mgetFunction(buffer,sockfd,fileName,serv_addr);
+    } else if (!strcmp(argv[3], "cd")) {
         char *token;
-        FILE_ARRAY fileArray;
-        int j;
-        struct timeval beginTime, endTime;
-        unsigned long long int elapsedTime;
 
-        gettimeofday(&beginTime, NULL);
+        sprintf(buffer, "cd %s", fileName);
 
-        initFileArray(&fileArray,1);
+        // Now the sockfd can be used to communicate to the server the LS request
+        write(sockfd, buffer, strlen(buffer));
 
-		sprintf(buffer, "mget %s", fileName);
+        read(sockfd, buffer, BUFSIZE);
 
-		// Now the sockfd can be used to communicate to the server the LS request
-		write(sockfd, buffer, strlen(buffer));
+        getFunction(buffer, sockfd, "a0.png");
 
-		while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
-        {
-            token = strtok(buffer, "$$");
+        printf("%s", buffer);
 
-            while( token != NULL )
-            {
-                //printf("%s\n", token);
-                insertFileArray(&fileArray, token);
+        sprintf(buffer, "reset");
 
-                token = strtok(NULL, "$$");
-            }
-        }
+        // Now the sockfd can be used to communicate to the server the LS request
+        write(sockfd, buffer, strlen(buffer));
 
-        printf("\n\n--------------------------------------------------------\n| Foram encontrados %d ficheiros. A começar download... |\n--------------------------------------------------------\n\n", (int) fileArray.used);
+        read(sockfd, buffer, BUFSIZE);
 
-        #if OperationMode
-            pthread_t *threads = malloc(fileArray.used * sizeof(*threads));
-
-            for(j = 0;j < (int) fileArray.used; j++) {
-                pthread_t thread_id;
-
-                THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
-
-                args->fileName = fileArray.data[j];
-                args->serv_addrAux = serv_addr;
-
-				pthread_create(&thread_id, NULL, &attendGET, args);
-                threads[j] = thread_id;
-            }
-
-            for(j = 0;j < (int) fileArray.used; j++) {
-                pthread_join(threads[j], NULL);
-            }
-        #else
-            int *pids = malloc(fileArray.used * sizeof(*pids));
-
-            for(j = 0;j < (int) fileArray.used; j++) {
-                if ((pid = fork()) == -1) {
-                    perror(argv[0]); exit(1);
-                }
-
-                if (pid == 0) {
-                    int sockfdAux;
-                    struct timeval beginTimeAux, endTimeAux;
-                    unsigned long long int elapsedTimeAux;
-
-                    gettimeofday(&beginTimeAux, NULL);
-
-                    if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-                        pexit("socket() failed");
-
-                    // Connect tot he socket offered by the web server
-                    if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-                        pexit("connect() failed");
-
-                    //getFunction(buffer, sockfdAux, fileArray.data[j], &downloadFlag);
-                    getFunction(buffer, sockfdAux, fileArray.data[j]);
-
-                    close(sockfdAux);
-
-                    gettimeofday(&endTimeAux, NULL);
-
-                    elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
-
-                    //if(downloadFlag)
-                        printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
-
-                    exit(j);
-                } else {
-                    pids[j] = pid;
-                }
-            }
-
-            for(j = 0;j < (int) fileArray.used; j++)
-            {
-                int result;
-                waitpid(pids[j], &result, 0);
-            }
-
-            freeFileArray(&fileArray);
-        #endif
-
-        //printf("int; %d\n\n\n", downloadFlag);
-
-        //if(downloadFlag)
-            printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
-
-        gettimeofday(&endTime, NULL);
-
-        elapsedTime = (unsigned long long) (endTime.tv_sec-beginTime.tv_sec)*1000000 + endTime.tv_usec-beginTime.tv_usec;
-
-        printf("Demorei %llu microsegundos.\n\n",elapsedTime);
+        printf("%s", buffer);
 	} else {
 		// implement new methods
 		printf("unsuported method\n");
@@ -300,15 +143,213 @@ void getFunction(char * buffer, int sockfd, char * fileName)
 
 	while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
     {
-        if(strcmp(buffer,"erro") == 0)
-        {
+        if(strcmp(buffer,"erro") == 0) {
             printf("Ocorreu um erro ao tentar abrir o ficheiro\n\n");
             //*downloadFlag = 0;
+        } else if (strcmp(buffer,"negado") == 0) {
+            printf("Operação não permitida!\n\n");
         } else {
             write(filedesc, buffer, i);
             //*downloadFlag = 1;
         }
     }
+}
+
+void putFunction (char * buffer, int sockfd, int filedesc, char * fileName, long long ret, struct stat stat_buf) {
+    sprintf(buffer, "put /%s", fileName);
+    printf("-> put /%s\n", fileName);
+
+    write(sockfd, buffer, strlen(buffer));
+
+    ret = read(sockfd, buffer, BUFSIZE); 	// read Web request in one go
+    buffer[ret] = 0; 						// put a null at the end
+
+    if (ret > 0) {
+        printf("<- %s\n", buffer);
+        if (!strcmp(buffer, "OK")) { // check if it is OK on the ftp server side
+
+            // open the file to be sent
+            filedesc = open(fileName, O_RDWR);
+
+            // get the size of the file to be sent
+            fstat(filedesc, &stat_buf);
+
+            // Read data from file and send it
+            ret = 0;
+            while (1) {
+                unsigned char buff[BUFSIZE] = { 0 };
+                int nread = read(filedesc, buff, BUFSIZE);
+                ret += nread;
+                printf("\nBytes read %d \n", nread);
+
+                // if read was success, send data.
+                if (nread > 0) {
+                    printf("Sending \n");
+                    write(sockfd, buff, nread);
+                }
+
+                // either there was error, or we reached end of file.
+                if (nread < BUFSIZE) {
+                    if (ret == stat_buf.st_size)
+                        printf("End of file\n");
+                    else
+                        printf("Error reading\n");
+                    break;
+                }
+            }
+
+            if (ret == -1) {
+                fprintf(stderr, "error sending the file\n");
+                exit(1);
+            }
+            if (ret != stat_buf.st_size) {
+                fprintf(stderr,
+                        "incomplete transfer when sending: %lld of %d bytes\n",
+                        ret, (int) stat_buf.st_size);
+                exit(1);
+            }
+        } else {
+            printf("ERROR on the server");
+        }
+
+        // close descriptor for file that was sent
+        close(filedesc);
+
+        // close socket descriptor
+        close(sockfd);
+    }
+}
+
+void lsFunction(char * buffer, int sockfd, char * fileName) {
+    char *token;
+    int i;
+
+    sprintf(buffer, "ls %s", fileName);
+
+    // Now the sockfd can be used to communicate to the server the LS request
+    write(sockfd, buffer, strlen(buffer));
+
+    while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
+    {
+        token = strtok(buffer, "$$");
+
+        while( token != NULL )
+        {
+            printf("%s\n", token);
+
+            token = strtok(NULL, "$$");
+        }
+    }
+}
+
+void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in serv_addr) {
+    char *token;
+    FILE_ARRAY fileArray;
+    int j, i;
+    struct timeval beginTime, endTime;
+    unsigned long long int elapsedTime;
+
+    gettimeofday(&beginTime, NULL);
+
+    initFileArray(&fileArray,1);
+
+    sprintf(buffer, "mget %s", fileName);
+
+    // Now the sockfd can be used to communicate to the server the LS request
+    write(sockfd, buffer, strlen(buffer));
+
+    while ((i = read(sockfd, buffer, BUFSIZE)) > 0)
+    {
+        token = strtok(buffer, "$$");
+
+        while( token != NULL )
+        {
+            //printf("%s\n", token);
+            insertFileArray(&fileArray, token);
+
+            token = strtok(NULL, "$$");
+        }
+    }
+
+    printf("\n\n--------------------------------------------------------\n| Foram encontrados %d ficheiros. A começar download... |\n--------------------------------------------------------\n\n", (int) fileArray.used);
+
+    #if OperationMode
+        pthread_t *threads = malloc(fileArray.used * sizeof(*threads));
+
+        for(j = 0;j < (int) fileArray.used; j++) {
+            pthread_t thread_id;
+
+            THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
+
+            args->fileName = fileArray.data[j];
+            args->serv_addrAux = serv_addr;
+
+            pthread_create(&thread_id, NULL, &attendGET, args);
+            threads[j] = thread_id;
+        }
+
+        for(j = 0;j < (int) fileArray.used; j++) {
+            pthread_join(threads[j], NULL);
+        }
+    #else
+        int *pids = malloc(fileArray.used * sizeof(*pids));
+
+                for(j = 0;j < (int) fileArray.used; j++) {
+                    if ((pid = fork()) == -1) {
+                        perror(argv[0]); exit(1);
+                    }
+
+                    if (pid == 0) {
+                        int sockfdAux;
+                        struct timeval beginTimeAux, endTimeAux;
+                        unsigned long long int elapsedTimeAux;
+
+                        gettimeofday(&beginTimeAux, NULL);
+
+                        if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+                            pexit("socket() failed");
+
+                        // Connect tot he socket offered by the web server
+                        if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+                            pexit("connect() failed");
+
+                        //getFunction(buffer, sockfdAux, fileArray.data[j], &downloadFlag);
+                        getFunction(buffer, sockfdAux, fileArray.data[j]);
+
+                        close(sockfdAux);
+
+                        gettimeofday(&endTimeAux, NULL);
+
+                        elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+
+                        //if(downloadFlag)
+                            printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
+
+                        exit(j);
+                    } else {
+                        pids[j] = pid;
+                    }
+                }
+
+                for(j = 0;j < (int) fileArray.used; j++)
+                {
+                    int result;
+                    waitpid(pids[j], &result, 0);
+                }
+
+                freeFileArray(&fileArray);
+    #endif
+
+    //printf("int; %d\n\n\n", downloadFlag);
+
+    //if(downloadFlag)
+    printf("\n\n-----------------------------------\n| Download terminado com sucesso. |\n-----------------------------------\n\n");
+
+    gettimeofday(&endTime, NULL);
+
+    elapsedTime = (unsigned long long) (endTime.tv_sec-beginTime.tv_sec)*1000000 + endTime.tv_usec-beginTime.tv_usec;
+
+    printf("Demorei %llu microsegundos.\n\n",elapsedTime);
 }
 
 void initFileArray(FILE_ARRAY *a, size_t initialSize) {

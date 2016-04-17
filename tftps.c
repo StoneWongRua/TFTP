@@ -24,14 +24,7 @@
 #define BUFSIZE 8096
 #define OperationMode 1
 
-#if OperationMode
-	typedef struct {
-		int * fd;
-		int hit;
-	} THREAD_ARGS;
-
-    void *attendFTP(void *);
-#endif
+char * defaultPath;
 
 int ftp(int fd, int hit);
 
@@ -45,6 +38,50 @@ void lsFunction(int fd, char * dirName);
 
 void mgetFunction(int fd, char *dirName);
 
+void cdFunction(int fd, char * dirName);
+
+void cdResetFunction(int fd);
+
+#if OperationMode
+typedef struct {
+	int * fd;
+	int hit;
+} THREAD_ARGS;
+
+typedef struct
+{
+	int buf[BUFSIZE];     /* shared var */
+	int in;               /* buf[in%BUFSIZE] is the first empty slot */
+	int out;              /* buf[out%BUFSIZE] is the first full slot */
+	sem_t full;           /* keep track of the number of full spots */
+	sem_t empty;          /* keep track of the number of empty spots */
+	pthread_mutex_t mutex;          /* enforce mutual exclusion to shared data */
+} CONSUMER_STRUCT;
+
+CONSUMER_STRUCT shared;
+
+void *Consumer(void *arg)
+{
+	int hit;
+
+	hit = *(int *)arg;
+	sem_wait(&shared.full);
+	pthread_mutex_lock(&shared.mutex);
+
+	ftp(shared.buf[shared.out], hit);
+	shared.buf[shared.out] = 0;
+
+	/* Release the buffer */
+	pthread_mutex_unlock(&shared.mutex);
+	/* Increment the number of full slots */
+	sem_post(&shared.empty);
+
+	return NULL;
+}
+
+void *attendFTP(void *);
+#endif
+
 /* just checks command line arguments, setup a listening socket and block on accept waiting for clients */
 
 int main(int argc, char **argv) {
@@ -57,8 +94,10 @@ int main(int argc, char **argv) {
 		printf("\n\nhint: ./tftps Port-Number Top-Directory\n\n""\ttftps is a small and very safe mini ftp server\n""\tExample: ./tftps 8181 ./fileDir \n\n");
 		exit(0);
 	}
-	
-	if (chdir(argv[2]) == -1) {
+
+	defaultPath = argv[2];
+
+	if (chdir(defaultPath) == -1) {
 		printf("ERROR: Can't Change to directory %s\n", argv[2]);
 		exit(4);
 	}
@@ -71,17 +110,17 @@ int main(int argc, char **argv) {
 	port = atoi(argv[1]);
 	if (port < 0 || port > 60000)
 		printf("ERROR Invalid port number (try 1->60000)\n");
-		
 
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serv_addr.sin_port = htons(port);
-	
+
 	if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
 		printf("ERROR system call - bind error\n");
 	if (listen(listenfd, 64) < 0)
 		printf("ERROR system call - listen error\n");
 
+	printf("Teste\n\n\n\n");
 
 	// Main LOOP
 	for (hit = 1 ;; hit++) {
@@ -93,26 +132,27 @@ int main(int argc, char **argv) {
 			printf("ERROR system call - accept error\n");
 		else
 		{
-			#if OperationMode            
-                pthread_t thread_id;
-    
-                THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
+#if OperationMode
+			printf("Teste2\n\n\n");
+			pthread_t thread_id;
 
-				int * sockAUX = (int *) malloc(sizeof(int *));
+			THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
 
-				*sockAUX = socketfd;
+			int * sockAUX = (int *) malloc(sizeof(int *));
 
-                args->fd = sockAUX;
-                args->hit = hit;
+			*sockAUX = socketfd;
 
-                if (args != NULL) {
-                    if (pthread_create(&thread_id, NULL, &attendFTP, args)) {
-                        perror("could not create thread");
-                        return 1;
-                    }
-                }
-            #else
-                pid = fork();
+			args->fd = sockAUX;
+			args->hit = hit;
+
+			if (args != NULL) {
+				if (pthread_create(&thread_id, NULL, &attendFTP, args)) {
+					perror("could not create thread");
+					return 1;
+				}
+			}
+#else
+			pid = fork();
                 if(pid==0) {
                     ftp(socketfd, hit);
                 } else {
@@ -120,27 +160,27 @@ int main(int argc, char **argv) {
                     close(socketfd);
                     kill(pid, SIGCHLD);
                 }
-            #endif
+#endif
 		}
 	}
 }
 
 #if OperationMode
-	void *attendFTP(void *argp) {
-        THREAD_ARGS *args = argp;
-        
-        int sock = *args->fd;
+void *attendFTP(void *argp) {
+	THREAD_ARGS *args = argp;
 
-        ftp(sock, args->hit);
+	int sock = *args->fd;
 
-		free(args->fd);
+	ftp(sock, args->hit);
 
-        free(args);
-        
-        pthread_exit(NULL);
-        
-        return NULL;
-    }
+	free(args->fd);
+
+	free(args);
+
+	pthread_exit(NULL);
+
+	return NULL;
+}
 #endif
 
 /* this is the ftp server function */
@@ -177,7 +217,13 @@ int ftp(int fd, int hit) {
 
 	if (!strncmp(buffer, "get ", 4)) {
 		// GET
-		getFunction(fd, &buffer[5]);
+		if((buffer[5] == '.' && buffer[6] == '.') || buffer[5] == '|') {
+			sprintf(buffer, "%s", "negado");
+			write(fd,buffer,BUFSIZE);
+			close(fd);
+		} else {
+			getFunction(fd, &buffer[4]);
+		}
 	} else if (!strncmp(buffer, "put ", 4)) {
 		// PUT
 		putFunction(fd,&buffer[5]);
@@ -187,6 +233,12 @@ int ftp(int fd, int hit) {
 	} else if (!strncmp(buffer, "mget ", 4)) {
 		// MGET
 		mgetFunction(fd, &buffer[5]);
+	} else if (!strncmp(buffer, "cd ", 3)) {
+		// CD
+		cdFunction(fd,&buffer[3]);
+	} else if (!strncmp(buffer, "reset ", 5)) {
+		// RESET CD
+		cdResetFunction(fd);
 	}
 
 	sleep(1); /* allow socket to drain before signalling the socket is closed */
@@ -198,21 +250,19 @@ void getFunction(int fd, char * fileName){
 	int file_fd;
 	long ret;
 
-	printf("FD GET: %d\n\n", fd);
-
 	/*static*/ char buffer[BUFSIZE + 1] = {0}; /* static so zero filled */
 
 	if ((file_fd = open(fileName, O_RDONLY)) == -1) { /* open the file for reading */
 		printf("ERROR failed to open file %s\n", fileName);
-        printf("Err: %d\n\n",errno);
-        sprintf(buffer, "%s", "erro");
-        write(fd,buffer,BUFSIZE);
+		printf("Err: %d\n\n",errno);
+		sprintf(buffer, "%s", "erro");
+		write(fd,buffer,BUFSIZE);
 		close(fd);
-        return;
+		return;
 	}
-	
+
 	printf("GET -> LOG SEND %s \n", fileName);
-	
+
 	/* send file in 8KB block - last block may be smaller */
 	while ((ret = read(file_fd, buffer, BUFSIZE)) > 0) {
 		write(fd, buffer, ret);
@@ -222,9 +272,9 @@ void getFunction(int fd, char * fileName){
 void putFunction(int fd, char * fileName){
 	int file_fd;
 	long ret;
-	
+
 	/*static*/ char buffer[BUFSIZE + 1] = {0}; /* static so zero filled */
-    
+
 	printf("PUT -> LOG Header %s \n", fileName);
 
 	file_fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0777);
@@ -242,56 +292,86 @@ void putFunction(int fd, char * fileName){
 
 void lsFunction(int fd, char * dirName){
 	printf("LS -> LOG Header %s \n", dirName);
-    
-    static char buffer[BUFSIZE + 1];
-    
-    sprintf(buffer, "%s", listFilesDir(dirName));
-    write(fd,buffer,BUFSIZE);
+
+	static char buffer[BUFSIZE + 1];
+
+	sprintf(buffer, "%s", listFilesDir(dirName));
+	write(fd,buffer,BUFSIZE);
 }
 
 void mgetFunction(int fd, char *dirName)
 {
 	FILE *fp;
-    char path[255];
-    
-    static char buffer[BUFSIZE + 1];
-    
-    printf("MGET COUNT -> LOG Header %s \n", dirName);
-    
-    sprintf(buffer, "%s", listFilesDir(dirName));
-    write(fd,buffer,BUFSIZE);
+	char path[255];
+
+	static char buffer[BUFSIZE + 1];
+
+	printf("MGET COUNT -> LOG Header %s \n", dirName);
+
+	sprintf(buffer, "%s", listFilesDir(dirName));
+	write(fd,buffer,BUFSIZE);
 }
 
 char * listFilesDir(char * dirName)
 {
-    DIR *midir;
-    struct dirent* info_archivo;
-    struct stat fileStat;
-    char fullpath[256];
-    char *files = malloc (sizeof (char) * BUFSIZE);
-    
-    if ((midir=opendir(dirName)) == NULL)
-    {
-        return "\nO directorio pedido não existe.\n";
-    }
-    
-    while ((info_archivo = readdir(midir)) != 0)
-    {
-        strcpy (fullpath, dirName);
-        strcat (fullpath, "/");
-        strcat (fullpath, info_archivo->d_name);
-        if (!stat(fullpath, &fileStat))
-        {
-            if(!S_ISDIR(fileStat.st_mode))
-            {
-                strcat (files, info_archivo->d_name);
-                strcat (files, "$$");
-            }
-        } else {
-            return "\nErro ao ler o directório.\n";
-        }
-    }
-    closedir(midir);
-    
-    return files;
+	DIR *midir;
+	struct dirent* info_archivo;
+	struct stat fileStat;
+	char fullpath[256];
+	char *files = malloc (sizeof (char) * BUFSIZE);
+
+	if ((midir=opendir(dirName)) == NULL)
+	{
+		return "\nO directorio pedido não existe.\n";
+	}
+
+	while ((info_archivo = readdir(midir)) != 0)
+	{
+		strcpy (fullpath, dirName);
+		strcat (fullpath, "/");
+		strcat (fullpath, info_archivo->d_name);
+		if (!stat(fullpath, &fileStat))
+		{
+			if(!S_ISDIR(fileStat.st_mode))
+			{
+				strcat (files, info_archivo->d_name);
+				strcat (files, "$$");
+			}
+		} else {
+			return "\nErro ao ler o directório.\n";
+		}
+	}
+	closedir(midir);
+
+	return files;
+}
+
+void cdFunction(int fd, char * dirName){
+
+	printf("CD -> LOG Header %s \n", dirName);
+
+	static char buffer[BUFSIZE + 1];
+
+	if (chdir(dirName) == -1) {
+		sprintf(buffer, "ERROR: Can't Change to directory %s\n", dirName);
+		write(fd,buffer,BUFSIZE);
+	} else {
+		sprintf(buffer, "Remote dir is now: %s\n", dirName);
+		write(fd,buffer,BUFSIZE);
+	}
+}
+
+void cdResetFunction(int fd) {
+
+	printf("CD -> LOG Header %s \n", defaultPath);
+
+	static char buffer[BUFSIZE + 1];
+
+	if (chdir(defaultPath) == -1) {
+		sprintf(buffer, "ERROR: Can't Change to base directory\n");
+		write(fd,buffer,BUFSIZE);
+	} else {
+		sprintf(buffer, "Remote dir is now reseted\n");
+		write(fd,buffer,BUFSIZE);
+	}
 }
