@@ -134,7 +134,7 @@ void getFunction(char * buffer, int sockfd, char * fileName)
 {
 	int i, filedesc;
 
-	sprintf(buffer, "get /%s", fileName);
+	sprintf(buffer, "get %s", fileName);
 
 	// Now the sockfd can be used to communicate to the server the GET request
 	write(sockfd, buffer, strlen(buffer));

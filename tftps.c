@@ -22,7 +22,7 @@
 #include <semaphore.h>
 
 #define BUFSIZE 8096
-#define OperationMode 1
+#define OperationMode 2
 
 char * defaultPath;
 
@@ -48,6 +48,7 @@ typedef struct {
 	int hit;
 } THREAD_ARGS;
 
+#if OperationMode == 2
 typedef struct
 {
 	int buf[BUFSIZE];     /* shared var */
@@ -60,24 +61,8 @@ typedef struct
 
 CONSUMER_STRUCT shared;
 
-void *Consumer(void *arg)
-{
-	int hit;
-
-	hit = *(int *)arg;
-	sem_wait(&shared.full);
-	pthread_mutex_lock(&shared.mutex);
-
-	ftp(shared.buf[shared.out], hit);
-	shared.buf[shared.out] = 0;
-
-	/* Release the buffer */
-	pthread_mutex_unlock(&shared.mutex);
-	/* Increment the number of full slots */
-	sem_post(&shared.empty);
-
-	return NULL;
-}
+void *Consumer(void *arg);
+#endif
 
 void *attendFTP(void *);
 #endif
@@ -85,16 +70,24 @@ void *attendFTP(void *);
 /* just checks command line arguments, setup a listening socket and block on accept waiting for clients */
 
 int main(int argc, char **argv) {
-	int i, port, pid, listenfd, socketfd, hit;
+	int i, port, pid, listenfd, socketfd, hit, consumers;
 	socklen_t length;
 	static struct sockaddr_in cli_addr; /* static = initialised to zeros */
 	static struct sockaddr_in serv_addr; /* static = initialised to zeros */
 
+#if OperationMode == 2
+	if (argc < 5 || argc > 5 || !strcmp(argv[1], "-?")) {
+		printf("\n\nhint: ./tftps Port-Number Top-Directory Consumer-Threads Buffer-Size\n\n""\ttftps is a small and very safe mini ftp server\n""\tExample: ./tftps 8181 ./fileDir \n\n");
+		exit(0);
+	}
+	consumers = atoi(argv[3]);
+#else
 	if (argc < 3 || argc > 3 || !strcmp(argv[1], "-?")) {
 		printf("\n\nhint: ./tftps Port-Number Top-Directory\n\n""\ttftps is a small and very safe mini ftp server\n""\tExample: ./tftps 8181 ./fileDir \n\n");
 		exit(0);
 	}
-
+#endif
+	port = atoi(argv[1]);
 	defaultPath = argv[2];
 
 	if (chdir(defaultPath) == -1) {
@@ -107,7 +100,6 @@ int main(int argc, char **argv) {
 	/* setup the network socket */
 	if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 		printf("ERROR system call - setup the socket\n");
-	port = atoi(argv[1]);
 	if (port < 0 || port > 60000)
 		printf("ERROR Invalid port number (try 1->60000)\n");
 
@@ -120,7 +112,24 @@ int main(int argc, char **argv) {
 	if (listen(listenfd, 64) < 0)
 		printf("ERROR system call - listen error\n");
 
-	printf("Teste\n\n\n\n");
+#if OperationMode == 2
+	pthread_t idC;
+	int index = 0, item;
+
+	sem_t *semFull = sem_open("/semFull", O_CREAT, 0644, 0);
+	sem_t *semEmpty = sem_open("/semEmpty", O_CREAT, 0644, BUFSIZE);
+
+	shared.full = *semFull;
+	shared.empty = *semEmpty;
+
+	pthread_mutex_init(&shared.mutex, NULL);
+
+	/*create a new Consumer*/
+	for(index=0; index<consumers; index++)
+	{
+		pthread_create(&idC, NULL, Consumer, (void*)&index);
+	}
+#endif
 
 	// Main LOOP
 	for (hit = 1 ;; hit++) {
@@ -133,7 +142,7 @@ int main(int argc, char **argv) {
 		else
 		{
 #if OperationMode
-			printf("Teste2\n\n\n");
+#if OperationMode == 1
 			pthread_t thread_id;
 
 			THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
@@ -152,6 +161,22 @@ int main(int argc, char **argv) {
 				}
 			}
 #else
+            printf("Entrei aqui pela %d vez\n\n", hit);
+
+			item = socketfd;
+
+			sem_wait(&shared.empty);
+			pthread_mutex_lock(&shared.mutex);
+
+			shared.buf[shared.in] = item;
+
+			shared.in = (shared.in + 1) % BUFSIZE;
+			fflush(stdout);
+
+			pthread_mutex_unlock(&shared.mutex);
+			sem_post(&shared.full);
+#endif
+#else
 			pid = fork();
                 if(pid==0) {
                     ftp(socketfd, hit);
@@ -165,7 +190,7 @@ int main(int argc, char **argv) {
 	}
 }
 
-#if OperationMode
+#if OperationMode == 1
 void *attendFTP(void *argp) {
 	THREAD_ARGS *args = argp;
 
@@ -179,6 +204,36 @@ void *attendFTP(void *argp) {
 
 	pthread_exit(NULL);
 
+	return NULL;
+}
+#endif
+
+#if OperationMode == 2
+void *Consumer(void *arg)
+{
+	int fd, workerID, i, hit=0;
+
+	workerID = *(int *)arg;
+
+	for (;;) {
+		sem_wait(&shared.full);
+		pthread_mutex_lock(&shared.mutex);
+		fd = shared.buf[shared.out];
+		shared.buf[shared.out] = 0;
+		shared.out = (shared.out+1)%BUFSIZE;
+		pthread_mutex_unlock(&shared.mutex);
+		printf("\n[C%d] Consumed. I got  %d ...Valor do buffer: %d na posição %d\n\n\n", workerID, fd, shared.buf[shared.out], shared.out);
+		ftp(fd, hit);
+		fflush(stdout);
+		printf("\n\n\n\nEstado do buffer:\n\n\n\n");
+		for (i = 0; i < BUFSIZE; i++) {
+			//printf("%d ", shared.buf[i]);
+		}
+		/* Release the buffer */
+		/* Increment the number of full slots */
+		sem_post(&shared.empty);
+		hit++;
+	}
 	return NULL;
 }
 #endif
