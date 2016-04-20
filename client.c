@@ -281,7 +281,13 @@ void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in
 
             THREAD_ARGS *args = malloc(sizeof(THREAD_ARGS));
 
-            args->fileName = fileArray.data[j];
+            if(fileName[0] != '.') {
+                //A concluir se tiver tempo
+                args->fileName = fileArray.data[j];
+            }
+            else
+                args->fileName = fileArray.data[j];
+
             args->serv_addrAux = serv_addr;
 
             pthread_create(&thread_id, NULL, &attendGET, args);
@@ -421,6 +427,7 @@ void *attendGET(void *argp) {
     // Connect tot he socket offered by the web server
     if (connect(sockfdAux, (struct sockaddr *) &args->serv_addrAux, sizeof(args->serv_addrAux)) < 0)
         pexit("connect() failed");
+
 
     //getFunction(buffer, sockfdAux, args->fileName, &downloadFlag);
     getFunction(buffer, sockfdAux, args->fileName);

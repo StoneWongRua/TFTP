@@ -22,7 +22,7 @@
 #include <semaphore.h>
 
 #define BUFSIZE 8096
-#define OperationMode 2
+#define OperationMode 1
 
 char * defaultPath;
 
@@ -256,9 +256,11 @@ void onAlarm(int signum) {
 void printBuffer() {
 	int i = 0;
 	printf("\n\n\n\nEstado do buffer:\n");
+	pthread_mutex_lock(&shared.mutex);
 	for (i = 0; i < (int) shared.buffSize; i++) {
 		printf("%d ", shared.buff[i]);
 	}
+	pthread_mutex_unlock(&shared.mutex);
 	printf("\n\n\n");
 }
 #endif
@@ -288,12 +290,12 @@ int ftp(int fd, int hit) {
 	printf("LOG request %s - hit %d\n", buffer, hit);
 
 	/* null terminate after the second space to ignore extra stuff */
-	for (i = 4; i < BUFSIZE; i++) {
-		if (buffer[i] == ' ') { /* string is "GET URL " +lots of other stuff */
+	/*for (i = 4; i < BUFSIZE; i++) {
+		if (buffer[i] == ' ') { // string is "GET URL " +lots of other stuff
 			buffer[i] = 0;
 			break;
 		}
-	}
+	}*/
 
 	if (!strncmp(buffer, "get ", 4)) {
 		// GET
