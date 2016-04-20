@@ -6,7 +6,7 @@ This is the repo for my implementation of a TFTP server and it's respective clie
 
 ## Changelog
 - Server
-    - Launches a child process for each file request or a thread for each file request, depending on your OperationMode flag (1 for threads, 0 for forks)
+    - Launches a child process for each file request, a thread for each file request or a pool of threads, depending on your OperationMode flag (2 for pool, 1 for threads, 0 for forks)
 - Client
     - Remote ls (list) all files in given dir
     - Remote mget (multiple get) - retrieves every file in the given dir, launching a child process or a thread for each file request, depending on your OperationMode flag (1 for threads, 0 for forks)
