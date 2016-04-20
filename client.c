@@ -46,7 +46,7 @@ void putFunction (char * buffer, int sockfd, int filedesc, char * fileName, long
 
 void lsFunction(char * buffer, int sockfd, char * fileName);
 
-void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in serv_addr);
+void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in serv_addr, char * programName);
 
 void initFileArray(FILE_ARRAY *a, size_t initialSize);
 
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     } else if (!strcmp(argv[3], "ls")) {
         lsFunction(buffer,sockfd,fileName);
     } else if (!strcmp(argv[3], "mget")) {
-        mgetFunction(buffer,sockfd,fileName,serv_addr);
+        mgetFunction(buffer,sockfd,fileName,serv_addr, argv[0]);
     } else if (!strcmp(argv[3], "cd")) {
         char *token;
 
@@ -242,12 +242,13 @@ void lsFunction(char * buffer, int sockfd, char * fileName) {
     }
 }
 
-void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in serv_addr) {
+void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in serv_addr, char * programName) {
     char *token;
     FILE_ARRAY fileArray;
     int j, i;
     struct timeval beginTime, endTime;
     unsigned long long int elapsedTime;
+    pid_t pid;
 
     gettimeofday(&beginTime, NULL);
 
@@ -300,50 +301,50 @@ void mgetFunction(char * buffer, int sockfd, char * fileName, struct sockaddr_in
     #else
         int *pids = malloc(fileArray.used * sizeof(*pids));
 
-                for(j = 0;j < (int) fileArray.used; j++) {
-                    if ((pid = fork()) == -1) {
-                        perror(argv[0]); exit(1);
-                    }
+        for(j = 0;j < (int) fileArray.used; j++) {
+            if ((pid = fork()) == -1) {
+                perror(programName); exit(1);
+            }
 
-                    if (pid == 0) {
-                        int sockfdAux;
-                        struct timeval beginTimeAux, endTimeAux;
-                        unsigned long long int elapsedTimeAux;
+            if (pid == 0) {
+                int sockfdAux;
+                struct timeval beginTimeAux, endTimeAux;
+                unsigned long long int elapsedTimeAux;
 
-                        gettimeofday(&beginTimeAux, NULL);
+                gettimeofday(&beginTimeAux, NULL);
 
-                        if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-                            pexit("socket() failed");
+                if ((sockfdAux = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+                    pexit("socket() failed");
 
-                        // Connect tot he socket offered by the web server
-                        if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-                            pexit("connect() failed");
+                // Connect tot he socket offered by the web server
+                if (connect(sockfdAux, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+                    pexit("connect() failed");
 
-                        //getFunction(buffer, sockfdAux, fileArray.data[j], &downloadFlag);
-                        getFunction(buffer, sockfdAux, fileArray.data[j]);
+                //getFunction(buffer, sockfdAux, fileArray.data[j], &downloadFlag);
+                getFunction(buffer, sockfdAux, fileArray.data[j]);
 
-                        close(sockfdAux);
+                close(sockfdAux);
 
-                        gettimeofday(&endTimeAux, NULL);
+                gettimeofday(&endTimeAux, NULL);
 
-                        elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
+                elapsedTimeAux = (endTimeAux.tv_sec-beginTimeAux.tv_sec)*1000000 + endTimeAux.tv_usec-beginTimeAux.tv_usec;
 
-                        //if(downloadFlag)
-                            printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
+                //if(downloadFlag)
+                    printf("O ficheiro pedido: %s foi recebido! Demorei %llu microsegundos.\n\n",fileArray.data[j], elapsedTimeAux);
 
-                        exit(j);
-                    } else {
-                        pids[j] = pid;
-                    }
-                }
+                exit(j);
+            } else {
+                pids[j] = pid;
+            }
+        }
 
-                for(j = 0;j < (int) fileArray.used; j++)
-                {
-                    int result;
-                    waitpid(pids[j], &result, 0);
-                }
+        for(j = 0;j < (int) fileArray.used; j++)
+        {
+            int result;
+            waitpid(pids[j], &result, 0);
+        }
 
-                freeFileArray(&fileArray);
+        freeFileArray(&fileArray);
     #endif
 
     //printf("int; %d\n\n\n", downloadFlag);
@@ -410,6 +411,7 @@ int pexit(char * msg) {
 	exit(1);
 }
 
+#if OperationMode
 void *attendGET(void *argp) {
 
     THREAD_ARGS *args = argp;
@@ -427,7 +429,6 @@ void *attendGET(void *argp) {
     // Connect tot he socket offered by the web server
     if (connect(sockfdAux, (struct sockaddr *) &args->serv_addrAux, sizeof(args->serv_addrAux)) < 0)
         pexit("connect() failed");
-
 
     //getFunction(buffer, sockfdAux, args->fileName, &downloadFlag);
     getFunction(buffer, sockfdAux, args->fileName);
@@ -447,3 +448,4 @@ void *attendGET(void *argp) {
 
     return NULL;
 }
+#endif

@@ -22,7 +22,7 @@
 #include <semaphore.h>
 
 #define BUFSIZE 8096
-#define OperationMode 1
+#define OperationMode 2
 
 char * defaultPath;
 
