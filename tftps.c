@@ -51,17 +51,24 @@ typedef struct {
 #if OperationMode == 2
 typedef struct
 {
-	int buf[BUFSIZE];     /* shared var */
-	int in;               /* buf[in%BUFSIZE] is the first empty slot */
-	int out;              /* buf[out%BUFSIZE] is the first full slot */
-	sem_t full;           /* keep track of the number of full spots */
-	sem_t empty;          /* keep track of the number of empty spots */
-	pthread_mutex_t mutex;          /* enforce mutual exclusion to shared data */
+	int *buff;
+	size_t buffSize;
+	int in;		/* first empty slot */
+	int out;	/* first full slot */
+	sem_t full;
+	sem_t empty;
+	pthread_mutex_t mutex;
 } CONSUMER_STRUCT;
 
 CONSUMER_STRUCT shared;
 
+void initConsumerStruct(CONSUMER_STRUCT *cs, size_t buffSize);
+
 void *Consumer(void *arg);
+
+void onAlarm(int signum);
+
+void printBuffer();
 #endif
 
 void *attendFTP(void *);
@@ -81,6 +88,8 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 	consumers = atoi(argv[3]);
+
+	initConsumerStruct(&shared, (size_t) atoi(argv[4]));
 #else
 	if (argc < 3 || argc > 3 || !strcmp(argv[1], "-?")) {
 		printf("\n\nhint: ./tftps Port-Number Top-Directory\n\n""\ttftps is a small and very safe mini ftp server\n""\tExample: ./tftps 8181 ./fileDir \n\n");
@@ -117,7 +126,7 @@ int main(int argc, char **argv) {
 	int index = 0, item;
 
 	sem_t *semFull = sem_open("/semFull", O_CREAT, 0644, 0);
-	sem_t *semEmpty = sem_open("/semEmpty", O_CREAT, 0644, BUFSIZE);
+	sem_t *semEmpty = sem_open("/semEmpty", O_CREAT, 0644, shared.buffSize);
 
 	shared.full = *semFull;
 	shared.empty = *semEmpty;
@@ -129,6 +138,13 @@ int main(int argc, char **argv) {
 	{
 		pthread_create(&idC, NULL, Consumer, (void*)&index);
 	}
+
+	struct sigaction act;
+	act.sa_handler = &onAlarm;
+	act.sa_flags = SA_RESTART;  // Restart interrupted system calls
+	sigaction(SIGALRM, &act, NULL);
+
+	alarm(30);
 #endif
 
 	// Main LOOP
@@ -161,19 +177,16 @@ int main(int argc, char **argv) {
 				}
 			}
 #else
-            printf("Entrei aqui pela %d vez\n\n", hit);
-
 			item = socketfd;
 
 			sem_wait(&shared.empty);
 			pthread_mutex_lock(&shared.mutex);
 
-			shared.buf[shared.in] = item;
-
-			shared.in = (shared.in + 1) % BUFSIZE;
-			fflush(stdout);
+			shared.buff[shared.in] = item;
 
 			pthread_mutex_unlock(&shared.mutex);
+
+			shared.in = (shared.in + 1) % shared.buffSize;
 			sem_post(&shared.full);
 #endif
 #else
@@ -209,32 +222,44 @@ void *attendFTP(void *argp) {
 #endif
 
 #if OperationMode == 2
+
+void initConsumerStruct(CONSUMER_STRUCT *cs, size_t buffSize) {
+	cs->buff = (int *) malloc(buffSize * sizeof(int));
+	cs->buffSize = buffSize;
+}
+
 void *Consumer(void *arg)
 {
-	int fd, workerID, i, hit=0;
-
-	workerID = *(int *)arg;
+	int fd, hit=0;
 
 	for (;;) {
 		sem_wait(&shared.full);
 		pthread_mutex_lock(&shared.mutex);
-		fd = shared.buf[shared.out];
-		shared.buf[shared.out] = 0;
-		shared.out = (shared.out+1)%BUFSIZE;
-		pthread_mutex_unlock(&shared.mutex);
-		printf("\n[C%d] Consumed. I got  %d ...Valor do buffer: %d na posição %d\n\n\n", workerID, fd, shared.buf[shared.out], shared.out);
-		ftp(fd, hit);
-		fflush(stdout);
-		printf("\n\n\n\nEstado do buffer:\n\n\n\n");
-		for (i = 0; i < BUFSIZE; i++) {
-			//printf("%d ", shared.buf[i]);
-		}
+		fd = shared.buff[shared.out];
+		shared.buff[shared.out] = 0;
+		shared.out = (shared.out+1)%shared.buffSize;
 		/* Release the buffer */
+		pthread_mutex_unlock(&shared.mutex);
+		ftp(fd, hit);
 		/* Increment the number of full slots */
 		sem_post(&shared.empty);
 		hit++;
 	}
 	return NULL;
+}
+
+void onAlarm(int signum) {
+	printBuffer();
+	alarm(30);
+}
+
+void printBuffer() {
+	int i = 0;
+	printf("\n\n\n\nEstado do buffer:\n");
+	for (i = 0; i < (int) shared.buffSize; i++) {
+		printf("%d ", shared.buff[i]);
+	}
+	printf("\n\n\n");
 }
 #endif
 
