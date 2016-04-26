@@ -19,7 +19,14 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <pthread.h>
+#ifdef __APPLE__
+#define ApplePositive 1
+#include <mach/semaphore.h>
+#include <mach/task.h>
+#include <mach/mach_init.h>
+#else
 #include <semaphore.h>
+#endif
 
 #define BUFSIZE 8096
 #define OperationMode 2
@@ -55,8 +62,13 @@ typedef struct
 	size_t buffSize;
 	int in;		/* first empty slot */
 	int out;	/* first full slot */
+#if ApplePositive
+	semaphore_t full;
+	semaphore_t empty;
+#else
 	sem_t full;
 	sem_t empty;
+#endif
 	pthread_mutex_t mutex;
 } CONSUMER_STRUCT;
 
@@ -125,11 +137,16 @@ int main(int argc, char **argv) {
 	pthread_t idC;
 	int index = 0, item;
 
+#if ApplePositive
+    semaphore_create(mach_task_self(), &shared.full, SYNC_POLICY_FIFO, 0);
+    semaphore_create(mach_task_self(), &shared.empty, SYNC_POLICY_FIFO, consumers);
+#else
 	sem_t *semFull = sem_open("/semFull", O_CREAT, 0644, 0);
 	sem_t *semEmpty = sem_open("/semEmpty", O_CREAT, 0644, shared.buffSize);
 
 	shared.full = *semFull;
 	shared.empty = *semEmpty;
+#endif
 
 	pthread_mutex_init(&shared.mutex, NULL);
 
@@ -179,15 +196,24 @@ int main(int argc, char **argv) {
 #else
 			item = socketfd;
 
+#if ApplePositive
+            semaphore_wait(shared.empty);
+#else
 			sem_wait(&shared.empty);
-			pthread_mutex_lock(&shared.mutex);
+#endif
+            pthread_mutex_lock(&shared.mutex);
 
 			shared.buff[shared.in] = item;
 
 			pthread_mutex_unlock(&shared.mutex);
 
 			shared.in = (shared.in + 1) % shared.buffSize;
+
+#if ApplePositive
+			semaphore_signal(shared.full);
+#else
 			sem_post(&shared.full);
+#endif
 #endif
 #else
 			pid = fork();
@@ -233,7 +259,11 @@ void *Consumer(void *arg)
 	int fd, hit=0;
 
 	for (;;) {
+#if ApplePositive
+		semaphore_wait(shared.full);
+#else
 		sem_wait(&shared.full);
+#endif
 		pthread_mutex_lock(&shared.mutex);
 		fd = shared.buff[shared.out];
 		shared.buff[shared.out] = 0;
@@ -242,7 +272,11 @@ void *Consumer(void *arg)
 		pthread_mutex_unlock(&shared.mutex);
 		ftp(fd, hit);
 		/* Increment the number of full slots */
+#if ApplePositive
+		semaphore_signal(shared.empty);
+#else
 		sem_post(&shared.empty);
+#endif
 		hit++;
 	}
 	return NULL;
