@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
 
 #if ApplePositive
     semaphore_create(mach_task_self(), &shared.full, SYNC_POLICY_FIFO, 0);
-    semaphore_create(mach_task_self(), &shared.empty, SYNC_POLICY_FIFO, consumers);
+    semaphore_create(mach_task_self(), &shared.empty, SYNC_POLICY_FIFO, shared.buffSize);
 #else
 	sem_t *semFull = sem_open("/semFull", O_CREAT, 0644, 0);
 	sem_t *semEmpty = sem_open("/semEmpty", O_CREAT, 0644, shared.buffSize);
