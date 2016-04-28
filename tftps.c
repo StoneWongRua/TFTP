@@ -219,10 +219,11 @@ int main(int argc, char **argv) {
 			pid = fork();
                 if(pid==0) {
                     ftp(socketfd, hit);
+                    exit(0);
                 } else {
                     //Temos de fechar o socketfd para que seja apenas a child a tratar dos pedidos, caso contrário iria ficar aqui pendurado
                     close(socketfd);
-                    kill(pid, SIGCHLD);
+                    signal(pid, SIGCHLD);
                 }
 #endif
 		}
