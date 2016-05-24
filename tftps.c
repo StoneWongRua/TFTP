@@ -251,7 +251,7 @@ void *attendFTP(void *argp) {
 #if OperationMode == 2
 
 void initConsumerStruct(CONSUMER_STRUCT *cs, size_t buffSize) {
-	cs->buff = (int *) malloc(buffSize * sizeof(int));
+	cs->buff = (int *) calloc(buffSize, sizeof(int));
 	cs->buffSize = buffSize;
 }
 
